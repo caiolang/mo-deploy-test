@@ -700,6 +700,7 @@ def _(pl, px):
         # fig.show()
 
         return fig
+
     return (plot_answer_histogram,)
 
 
@@ -739,6 +740,7 @@ def _(df_plot_variables, pl, plot_answer_histogram, px):
             figs_list.append(fig)
 
         return figs_list
+
     return (plot_histograms_income,)
 
 
@@ -1371,15 +1373,15 @@ def _(mo):
 @app.cell
 def _(enrich_first_and_last_time, get_df_long, get_vars_IGF, mo, pl):
     # Leitura do df original em CSV
-    df_original = pl.read_csv(
+    base_1 = str(
         mo.notebook_location()
         / "public"
         / "Carol_DataBaseFull_21052025_anonimizado.csv"
     )
+    base_2 = str(mo.notebook_location() / "public" / "Carol_DataBaseFull_Limpa.csv")
+    df_original = pl.read_csv(base_1)
     # Join com a versão anterior dos dados por conta de colunas que desapareceram na nova versão
-    df_old = pl.read_csv(
-        mo.notebook_location() / "public" / "Carol_DataBaseFull_Limpa.csv"
-    )
+    df_old = pl.read_csv(base_2)
     df_original = df_original.join(df_old, on=["id_family_datalake"])
 
     # Passa o dataframe para o formato long (uma row por resposta, ao invés de uma row por família)
@@ -1389,13 +1391,9 @@ def _(enrich_first_and_last_time, get_df_long, get_vars_IGF, mo, pl):
     df_long_periods = enrich_first_and_last_time(df_long)
 
     # Filtra só as respostas do tempo inicial e tempo final de cada família
-    df_long_first = df_long_periods.filter(
-        (pl.col("time") == (pl.col("time_first")))
-    )
+    df_long_first = df_long_periods.filter((pl.col("time") == (pl.col("time_first"))))
 
-    df_long_last = df_long_periods.filter(
-        (pl.col("time") == (pl.col("time_last")))
-    )
+    df_long_last = df_long_periods.filter((pl.col("time") == (pl.col("time_last"))))
 
     df_plot_variables = pl.concat(
         [
@@ -2216,6 +2214,7 @@ def _():
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
@@ -2230,6 +2229,7 @@ def _():
     import plotly.graph_objects as go
     from rich import print
     import numpy as np
+
     return GT, alt, loc, md, np, pl, print, px, style
 
 
@@ -3382,6 +3382,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
             if search_term in item
         ]
         print(filtered_list)
+
     return (
         cramers_v,
         enrich_first_and_last_time,
