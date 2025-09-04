@@ -1,6 +1,6 @@
 # marimo WebAssembly + GitHub Pages Template
 
-This template repository demonstrates how to export [marimo](https://marimo.io) notebooks to WebAssembly and deploy them to GitHub Pages.
+This template repository demonstrates how to export [marimo](https://marimo.io) notebooks to WebAssembly and deploy them to GitHub Pages. AAAA
 
 ## 📚 Included Examples
 
