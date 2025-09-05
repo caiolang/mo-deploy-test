@@ -700,7 +700,6 @@ def _(pl, px):
         # fig.show()
 
         return fig
-
     return (plot_answer_histogram,)
 
 
@@ -740,7 +739,6 @@ def _(df_plot_variables, pl, plot_answer_histogram, px):
             figs_list.append(fig)
 
         return figs_list
-
     return (plot_histograms_income,)
 
 
@@ -1365,27 +1363,15 @@ def _():
 
 
 @app.cell(column=1)
-def _(mo):
-    mo.notebook_location()
-    return
-
-
-@app.cell
-def _(enrich_first_and_last_time, get_df_long, get_vars_IGF, mo, pl):
+def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
     # Leitura do df original em CSV
-    base_1 = str(
+    df_long_path = str(
         mo.notebook_location()
         / "public"
-        / "Carol_DataBaseFull_21052025_anonimizado.csv"
+        / "df_long.csv"
     )
-    base_2 = str(mo.notebook_location() / "public" / "Carol_DataBaseFull_Limpa.csv")
-    df_original = pl.read_csv(base_1)
-    # Join com a versão anterior dos dados por conta de colunas que desapareceram na nova versão
-    df_old = pl.read_csv(base_2)
-    df_original = df_original.join(df_old, on=["id_family_datalake"])
-
     # Passa o dataframe para o formato long (uma row por resposta, ao invés de uma row por família)
-    df_long = get_df_long(df_original)
+    df_long = pl.read_csv(df_long_path)
 
     # Enriquece o df_long com as datas da primeira e da última coleta de cada família
     df_long_periods = enrich_first_and_last_time(df_long)
@@ -2214,7 +2200,6 @@ def _():
 @app.cell
 def _():
     import marimo as mo
-
     return (mo,)
 
 
@@ -2229,7 +2214,6 @@ def _():
     import plotly.graph_objects as go
     from rich import print
     import numpy as np
-
     return GT, alt, loc, md, np, pl, print, px, style
 
 
@@ -3382,14 +3366,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
             if search_term in item
         ]
         print(filtered_list)
-
-    return (
-        cramers_v,
-        enrich_first_and_last_time,
-        get_df_long,
-        get_vars_IGF,
-        plot_variables,
-    )
+    return cramers_v, enrich_first_and_last_time, get_vars_IGF, plot_variables
 
 
 if __name__ == "__main__":
