@@ -66,7 +66,9 @@ def _(GT, df_long_periods, loc, md, pl, style):
         GT(time_distribution)
         .tab_header(
             title=md("Distribuição de Tempo Inicial e Final"),
-            subtitle=md("Contagem de famílias por combinação de períodos de coleta"),
+            subtitle=md(
+                "Contagem de famílias por combinação de períodos de coleta"
+            ),
         )
         .cols_label(
             time_first=md("Tempo Inicial"),
@@ -196,7 +198,9 @@ def _(df_plot_variables, mo, pl, questions):
             )
             .filter(pl.col("answer") == "NA")
             .select("question", "time", count_col_name, "percentage")
-            .sort("percentage", "question", "time", descending=[True, False, False])
+            .sort(
+                "percentage", "question", "time", descending=[True, False, False]
+            )
         )
 
         return (
@@ -208,6 +212,7 @@ def _(df_plot_variables, mo, pl, questions):
             )
             .opt_stylize(style=1, color="blue")
         )
+
 
     gt = na_table(df_plot_variables, questions)
     mo.accordion({"Tabela": gt})
@@ -231,10 +236,12 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo, petals_cats):
+def _(mo, name_dict, petals_cats):
+    _options = {v: k for k, v in name_dict.items() if k in petals_cats}
+
     petal_to_plot = mo.ui.dropdown(
-        options=petals_cats,
-        value=petals_cats[0],
+        options=_options,
+        value=list(_options.keys())[0],
         label="Escolha uma categoria do IGF: ",
         searchable=True,
     )
@@ -249,7 +256,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(df_long_first, df_long_last, petal_to_plot, pl, px):
+def _(df_long_first, df_long_last, name_dict, petal_to_plot, pl, px):
     igf_color_dict = dict(
         value=[
             "E1",
@@ -292,7 +299,7 @@ def _(df_long_first, df_long_last, petal_to_plot, pl, px):
             "first_answer", "last_answer"
         ),
         dimensions=["first_answer", "last_answer"],
-        title=f"Pétala: <b>{question_name}</b>",
+        title=f"<b>{name_dict.get(question_name)}</b>",
         subtitle="Cores de acordo com a última resposta",
         color="color",
         labels={
@@ -392,6 +399,7 @@ def _(df_long_first, df_long_last, pl, px):
         )
         return fig
 
+
     parallel_plot()
     return
 
@@ -429,14 +437,15 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo, questions, wip_multiple_assertions, wip_other):
+def _(mo, name_dict, questions, wip_multiple_assertions, wip_other):
+    _question_names = sorted(
+        list((set(questions) - set(wip_other)) | set(wip_multiple_assertions))
+    )
+    _options = {v: k for k, v in name_dict.items() if k in _question_names}
+
     question_to_plot = mo.ui.dropdown(
-        options=sorted(
-            list((set(questions) - set(wip_other)) | set(wip_multiple_assertions))
-        ),
-        value=sorted(
-            list((set(questions) - set(wip_other)) | set(wip_multiple_assertions))
-        )[0],
+        options=_options,
+        value=list(_options.keys())[0],
         label="Escolha uma pergunta: ",
         searchable=True,
     )
@@ -503,7 +512,10 @@ def _(cramers_v, df_long_periods, np, pl, px):
             .unique()
             # Talvez -> Sim
             .with_columns(
-                [pl.col(col).replace({"Talvez": "Sim"}).alias(col) for col in columns]
+                [
+                    pl.col(col).replace({"Talvez": "Sim"}).alias(col)
+                    for col in columns
+                ]
             )
         )
 
@@ -543,6 +555,7 @@ def _(cramers_v, df_long_periods, np, pl, px):
             yaxis_title="Variáveis",
         )
         return fig
+
 
     cramer_plot()
     return
@@ -590,7 +603,9 @@ def _(pl, px):
         - Plotly figure object
         """
 
-        conditions = (pl.col("question") == question_name) & (pl.col("answer") != "NA")
+        conditions = (pl.col("question") == question_name) & (
+            pl.col("answer") != "NA"
+        )
 
         select_cols = [pl.col("answer").cast(pl.Float32)]
 
@@ -718,6 +733,7 @@ def _(df_plot_variables, pl, plot_answer_histogram, px):
         "Sim": [px.colors.qualitative.Pastel[2]],
     }
 
+
     def plot_histograms_income(col, percentage=True, cum=False):
         figs_list = []
         # for cum in [False, True]:
@@ -759,7 +775,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(cum_5, mo, pct_5, plot_histograms_income):
     mo.hstack(
-        plot_histograms_income("alcoholism", percentage=pct_5.value, cum=cum_5.value)
+        plot_histograms_income(
+            "alcoholism", percentage=pct_5.value, cum=cum_5.value
+        )
     )
     return
 
@@ -904,77 +922,77 @@ def _(cum_5, df_plot_variables, mo, pct_5, pl, plot_answer_histogram, px):
 
 @app.cell
 def _(mo):
-    mo.md(r"""#### Teste usando Altair""")
+    mo.md(r"""<!-- #### Teste usando Altair -->""")
     return
 
 
 @app.cell
-def _(BIN_SIZE, alt, df_plot_variables, mo, pl):
-    _df_plot = df_plot_variables.filter(
-        (pl.col("violence_women") == "Sim")
-        & (pl.col("violence_children") == "Sim")
-        & (pl.col("time") == "FIRST")
-        & (pl.col("question") == "Income")
-    )
+def _():
+    # _df_plot = df_plot_variables.filter(
+    #     (pl.col("violence_women") == "Sim")
+    #     & (pl.col("violence_children") == "Sim")
+    #     & (pl.col("time") == "FIRST")
+    #     & (pl.col("question") == "Income")
+    # )
 
-    _df_plot_baseline = df_plot_variables.filter(
-        (pl.col("violence_women") == "Não")
-        & (pl.col("violence_children") == "Não")
-        & (pl.col("time") == "FIRST")
-        & (pl.col("question") == "Income")
-    )
+    # _df_plot_baseline = df_plot_variables.filter(
+    #     (pl.col("violence_women") == "Não")
+    #     & (pl.col("violence_children") == "Não")
+    #     & (pl.col("time") == "FIRST")
+    #     & (pl.col("question") == "Income")
+    # )
 
-    _max_y = 100
+    # _max_y = 100
 
-    _figs = []
+    # _figs = []
 
-    # for cum in [False, True]:
-    for _df, _subtitle, _color_idx in [
-        (_df_plot, "SIM para Violências (mulher e criança)", 10),
-        (_df_plot_baseline, "NÃO para Violências (mulher e criança)", 9),
-    ]:
-        _fig = (
-            alt.Chart(_df)  # <-- replace with data
-            .mark_bar()
-            .encode(
-                x=alt.X(
-                    "answer",
-                    type="quantitative",
-                    bin=True,
-                    title="Income",
-                ),
-                y=alt.Y(
-                    "count()",
-                    type="quantitative",
-                    title="Number of records",
-                    scale=alt.Scale(domain=[0, _max_y]),
-                ),
-                tooltip=[
-                    alt.Tooltip(
-                        "answer",
-                        type="quantitative",
-                        # bin=True,
-                        bin=alt.Bin(step=BIN_SIZE),
-                        title="Income",
-                        format=",.2f",
-                    ),
-                    alt.Tooltip(
-                        "count()",
-                        type="quantitative",
-                        format=",.0f",
-                        title="Number of records",
-                    ),
-                ],
-            )
-            .properties(
-                width="container",
-                title=alt.TitleParams(text="Income", subtitle=_subtitle),
-            )
-            .configure_view(stroke=None)
-        )
-        _figs.append(_fig)
+    # # for cum in [False, True]:
+    # for _df, _subtitle, _color_idx in [
+    #     (_df_plot, "SIM para Violências (mulher e criança)", 10),
+    #     (_df_plot_baseline, "NÃO para Violências (mulher e criança)", 9),
+    # ]:
+    #     _fig = (
+    #         alt.Chart(_df)  # <-- replace with data
+    #         .mark_bar()
+    #         .encode(
+    #             x=alt.X(
+    #                 "answer",
+    #                 type="quantitative",
+    #                 bin=True,
+    #                 title="Income",
+    #             ),
+    #             y=alt.Y(
+    #                 "count()",
+    #                 type="quantitative",
+    #                 title="Number of records",
+    #                 scale=alt.Scale(domain=[0, _max_y]),
+    #             ),
+    #             tooltip=[
+    #                 alt.Tooltip(
+    #                     "answer",
+    #                     type="quantitative",
+    #                     # bin=True,
+    #                     bin=alt.Bin(step=BIN_SIZE),
+    #                     title="Income",
+    #                     format=",.2f",
+    #                 ),
+    #                 alt.Tooltip(
+    #                     "count()",
+    #                     type="quantitative",
+    #                     format=",.0f",
+    #                     title="Number of records",
+    #                 ),
+    #             ],
+    #         )
+    #         .properties(
+    #             width="container",
+    #             title=alt.TitleParams(text="Income", subtitle=_subtitle),
+    #         )
+    #         .configure_view(stroke=None)
+    #     )
+    #     _figs.append(_fig)
 
-    mo.hstack(_figs)
+    # mo.hstack(_figs)
     return
 
 
@@ -1083,11 +1101,13 @@ def _(df_plot_variables, mo, pct_5, pl, plot_variables, px):
 
     # for val in group_by_vals:
     _df_plot = df_plot_variables.filter(
-        (pl.col("violence_women") == "Sim") & (pl.col("violence_children") == "Sim")
+        (pl.col("violence_women") == "Sim")
+        & (pl.col("violence_children") == "Sim")
     )
 
     _df_plot_baseline = df_plot_variables.filter(
-        (pl.col("violence_women") == "Não") & (pl.col("violence_children") == "Não")
+        (pl.col("violence_women") == "Não")
+        & (pl.col("violence_children") == "Não")
     )
 
     for _df, _subtitle in [
@@ -1120,67 +1140,69 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(BIN_SIZE, alt, df_long, df_long_first, pl):
-    _data = (
-        df_long.filter(pl.col("question") == "HowManyPHHH")
-        .select(
-            "id_family_datalake",
-            pl.col("answer").alias("num_family_members"),
-            # "time",
-        )
-        .join(
-            df_long_first.filter(
-                (pl.col("question") == "Income")
-                & (pl.col("time") == "0")
-                & (pl.col("answer") != "NA")
-            ).select(
-                "id_family_datalake",
-                pl.col("answer").alias("income"),
-                # "time",
-            ),
-            on="id_family_datalake",
-        )
-        .with_columns(income_per_capita=pl.col("income") / pl.col("num_family_members"))
-    )
+def _():
+    # _data = (
+    #     df_long.filter(pl.col("question") == "HowManyPHHH")
+    #     .select(
+    #         "id_family_datalake",
+    #         pl.col("answer").alias("num_family_members"),
+    #         # "time",
+    #     )
+    #     .join(
+    #         df_long_first.filter(
+    #             (pl.col("question") == "Income")
+    #             & (pl.col("time") == 0)
+    #             & (pl.col("answer") != "NA")
+    #         ).select(
+    #             "id_family_datalake",
+    #             pl.col("answer").alias("income"),
+    #             # "time",
+    #         ),
+    #         on="id_family_datalake",
+    #     )
+    #     .with_columns(
+    #         income_per_capita=pl.col("income") / pl.col("num_family_members")
+    #     )
+    # )
 
-    _chart = (
-        alt.Chart(_data)  # <-- replace with data
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "income_per_capita",
-                type="quantitative",
-                bin=True,
-                title="income_per_capita",
-            ),
-            y=alt.Y("count()", type="quantitative", title="Number of records"),
-            tooltip=[
-                alt.Tooltip(
-                    "income_per_capita",
-                    type="quantitative",
-                    bin=alt.Bin(step=BIN_SIZE),
-                    title="income_per_capita",
-                    format=",.2f",
-                ),
-                alt.Tooltip(
-                    "count()",
-                    type="quantitative",
-                    format=",.0f",
-                    title="Number of records",
-                ),
-            ],
-        )
-        .properties(width="container")
-        .configure_view(stroke=None)
-    )
-    _chart
+    # _chart = (
+    #     alt.Chart(_data)  # <-- replace with data
+    #     .mark_bar()
+    #     .encode(
+    #         x=alt.X(
+    #             "income_per_capita",
+    #             type="quantitative",
+    #             bin=True,
+    #             title="income_per_capita",
+    #         ),
+    #         y=alt.Y("count()", type="quantitative", title="Number of records"),
+    #         tooltip=[
+    #             alt.Tooltip(
+    #                 "income_per_capita",
+    #                 type="quantitative",
+    #                 bin=alt.Bin(step=BIN_SIZE),
+    #                 title="income_per_capita",
+    #                 format=",.2f",
+    #             ),
+    #             alt.Tooltip(
+    #                 "count()",
+    #                 type="quantitative",
+    #                 format=",.0f",
+    #                 title="Number of records",
+    #             ),
+    #         ],
+    #     )
+    #     .properties(width="container")
+    #     .configure_view(stroke=None)
+    # )
+    # _chart
     return
 
 
 @app.cell
 def _():
     BIN_SIZE = 500
-    return (BIN_SIZE,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -1213,21 +1235,24 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo):
+def _(mo, name_dict):
     _questions = [
         "FoodManytimes",
         "SchoolLiteracy",
         "IncomeWorkS3",
     ]
-    _dimensions = ["gender", "race"]
+    _options = {v: k for k, v in name_dict.items() if k in _questions}
+
+    _dimensions = {v: k for k, v in name_dict.items() if k in ["gender", "race"]}
+
     question_6 = mo.ui.dropdown(
-        options=_questions,
-        value=_questions[0],
+        options=_options,
+        value=list(_options.keys())[0],
         label="Escolha uma pergunta:",
     )
     dimension_6 = mo.ui.dropdown(
         options=_dimensions,
-        value=_dimensions[0],
+        value=list(_dimensions.keys())[0],
         label="e uma dimensão de análise:",
     )
 
@@ -1236,7 +1261,7 @@ def _(mo):
 
 
 @app.cell
-def _(df_long_first, df_long_last, dimension_6, pl, px, question_6):
+def _(df_long_first, df_long_last, dimension_6, name_dict, pl, px, question_6):
     # [TODO] cores de acordo com a resposta, dependendo da _question_name
     _igf_color_dict = dict(
         value=["Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
@@ -1273,11 +1298,11 @@ def _(df_long_first, df_long_last, dimension_6, pl, px, question_6):
             "first_answer",
             "last_answer",
             # "color",
-            _dimension,
-        ).sort(_dimension, "first_answer", "last_answer"),
-        dimensions=[_dimension, "first_answer", "last_answer"],
-        title=f"<b>{_question_name}</b>",
-        # subtitle="Cores de acordo com a última resposta",
+            pl.col(_dimension).alias(name_dict.get(_dimension)),
+        ).sort(name_dict.get(_dimension), "first_answer", "last_answer"),
+        dimensions=[name_dict.get(_dimension), "first_answer", "last_answer"],
+        title=f"<b>{name_dict.get(_question_name)}</b>",
+        subtitle=f"[{_question_name}]",
         # color="color",
         labels={
             "first_answer": "Primeira resposta da família",
@@ -1365,11 +1390,7 @@ def _():
 @app.cell(column=1)
 def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
     # Leitura do df original em CSV
-    df_long_path = str(
-        mo.notebook_location()
-        / "public"
-        / "df_long.csv"
-    )
+    df_long_path = str(mo.notebook_location() / "public" / "df_long.csv")
     # Passa o dataframe para o formato long (uma row por resposta, ao invés de uma row por família)
     df_long = pl.read_csv(df_long_path)
 
@@ -1377,9 +1398,13 @@ def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
     df_long_periods = enrich_first_and_last_time(df_long)
 
     # Filtra só as respostas do tempo inicial e tempo final de cada família
-    df_long_first = df_long_periods.filter((pl.col("time") == (pl.col("time_first"))))
+    df_long_first = df_long_periods.filter(
+        (pl.col("time") == (pl.col("time_first")))
+    )
 
-    df_long_last = df_long_periods.filter((pl.col("time") == (pl.col("time_last"))))
+    df_long_last = df_long_periods.filter(
+        (pl.col("time") == (pl.col("time_last")))
+    )
 
     df_plot_variables = pl.concat(
         [
@@ -1437,7 +1462,6 @@ def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
         set(questions) - set(wip_multiple_assertions) - set(wip_other)
     )
     return (
-        df_long,
         df_long_first,
         df_long_last,
         df_long_periods,
@@ -1447,6 +1471,51 @@ def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
         wip_multiple_assertions,
         wip_other,
     )
+
+
+@app.cell
+def _():
+    name_dict = {
+        "race": "Raça",
+        "gender": "Gênero",
+        "Access": "Existe algum integrante da família que não tem acesso a atividades de lazer, recreação e convívio social?",
+        "BankAccount": "A família tem conta em banco?",
+        "Bathroom": "Sobre o banheiro da sua casa...",
+        "BathroomQualit": "Sobre o banheiro da sua casa, o que possui?",
+        "CEP": "O endereço da sua casa tem CEP?",
+        "CommFacilities": "Sobre a favela onde mora, assinale os itens que você possui acesso",
+        "CulturalEvent": "Com qual frequência vai a eventos culturais?",
+        "Documents": "Quais documentos vocês têm?",
+        "Eletricity": "Quanto à energia elétrica...",
+        "Floor": "O chão ou piso da sua casa é, na maioria dos cômodos, feito de qual material?",
+        "FoodManytimes": "Quantas vezes a família faz refeições ao dia?",
+        "Garbage": "O que é feito com o lixo da casa?   ",
+        "HealthGenKidsNames": "Quantos adultos maiores de 18 anos da família apresentam as seguintes condições?  ",
+        "HealthGenNames": "Quantas crianças e adolescentes de 0 a 17 anos da família apresentaram as seguintes condições?",
+        "HousingProblems": "Quais são as principais dificuldades e ou risco que sua família enfrenta morando nessa casa?",
+        "IncomeWorkS3": "Qual é a situação de trabalho principal?",
+        "Internet": "Para que você usa a internet? ",
+        "Roof": "De qual material é feita a cobertura da sua casa?",
+        "SchoolCurrent": "Está estudando?",
+        "SchoolLast": "Qual a escolaridade?  ",
+        "SchoolLiteracy": "Quão bem sabe ler e escrever?",
+        "SchoolMathLit": "Quão bem sabe fazer contas matemáticas?",
+        "Sewer": "Sobre o esgoto da sua casa...",
+        "Walls": "As paredes da sua casa são, na maioria dos cômodos, feitas de qual material?",
+        "Water": "Sobre o fornecimento de água...",
+        "WaterFrequency": "Com qual frequência você tem água na sua casa?",
+        "CategoriaIGF": "Média das dimensões do IGF",
+        "CategoriaIncome": "Geração de renda",
+        "CategoriaCitizenship": "Cidadania",
+        "CategoriaCulture": "Cultura",
+        "CategoriaFirstInfancy": "Primeira infância",
+        "CategoriaHealth": "Saúde",
+        "CategoriaHousing": "Moradia e urbanismo",
+        "CategoriaSchooling": "Educação",
+        "CategoriaWomanAutonomy": "Autonomia das mulheres",
+        "CategoriaEnvironment": "Meio ambiente",
+    }
+    return (name_dict,)
 
 
 @app.cell
@@ -2214,16 +2283,17 @@ def _():
     import plotly.graph_objects as go
     from rich import print
     import numpy as np
-    return GT, alt, loc, md, np, pl, print, px, style
+    return GT, loc, md, np, pl, print, px, style
 
 
 @app.cell
-def _(ASSERTION_MAP, np, pl, print, px):
+def _(ASSERTION_MAP, name_dict, np, pl, print, px):
     def get_assertion_map():
         """Returns the assertion map used to map answers to their respective categories."""
         from const import ASSERTION_MAP as assertion_map
 
         return assertion_map
+
 
     def get_descriptive_table(
         df_long_first,
@@ -2293,7 +2363,9 @@ def _(ASSERTION_MAP, np, pl, print, px):
                 .len(name="count_first")
                 .join(first_group_sum, on=describe_by, how="left")
                 .with_columns(
-                    pct_first=(pl.col("count_first") / pl.col("group_total_first")),
+                    pct_first=(
+                        pl.col("count_first") / pl.col("group_total_first")
+                    ),
                 )
             )
             .join(
@@ -2350,7 +2422,9 @@ def _(ASSERTION_MAP, np, pl, print, px):
         answer_map, answer_order = answer_maps[0], answer_orders[0]
 
         # Correct answer names with the mapping
-        df_print = df_print.with_columns(answer=pl.col("answer").replace(answer_map))
+        df_print = df_print.with_columns(
+            answer=pl.col("answer").replace(answer_map)
+        )
 
         gt_table = (
             GT(
@@ -2438,6 +2512,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
         )
         return gt_table
 
+
     def cramers_v(df, col1, col2, verbose=False):
         """
         Calculates Cramér's V statistic for association between two categorical columns in a Polars DataFrame.
@@ -2504,6 +2579,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
         cramers = np.sqrt(chi2 / (n * min(n_rows - 1, n_cols - 1)))
         return cramers
 
+
     def cramers_v_scipy(df, col1, col2, verbose=False):
         """
         Calculates Cramér's V statistic for association between two categorical columns in a Polars DataFrame using scipy.stats.contingency.association.
@@ -2546,6 +2622,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
 
         return association(ct, method="cramer")
 
+
     def get_vars_IGF():
         return [
             "Access",
@@ -2575,6 +2652,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
             "Water",
             "WaterFrequency",
         ]
+
 
     def plot_variables(
         df_long,
@@ -2642,7 +2720,8 @@ def _(ASSERTION_MAP, np, pl, print, px):
                         print("Removing from dataframe:")
                         print(
                             df_plot.filter(
-                                conditions & pl.col("answer").is_in(answer_order).not_()
+                                conditions
+                                & pl.col("answer").is_in(answer_order).not_()
                             )
                             .select(agg_cols)
                             .group_by(agg_cols)
@@ -2652,7 +2731,10 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     conditions &= pl.col("answer").is_in(answer_order)
 
                 df_plot = (
-                    df_plot.filter(conditions).select(agg_cols).group_by(agg_cols).len()
+                    df_plot.filter(conditions)
+                    .select(agg_cols)
+                    .group_by(agg_cols)
+                    .len()
                 )
 
                 # [TODO] Solução WIP para agrupar a uma resposta por família.
@@ -2667,19 +2749,27 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     )
 
                 df_pct = df_plot.with_columns(
-                    percentage=(pl.col("len") / pl.col("len").sum().over("time") * 100)
+                    percentage=(
+                        pl.col("len") / pl.col("len").sum().over("time") * 100
+                    )
                 )
 
-                df_pct_wo_na = df_plot.filter(pl.col("answer") != "NA").with_columns(
+                df_pct_wo_na = df_plot.filter(
+                    pl.col("answer") != "NA"
+                ).with_columns(
                     percentage_wo_na=(
                         pl.col("len") / pl.col("len").sum().over("time") * 100
                     )
                 )
 
                 df_plot = (
-                    df_plot.join(df_pct_wo_na, on=agg_cols, how="left", suffix="_wo_na")
+                    df_plot.join(
+                        df_pct_wo_na, on=agg_cols, how="left", suffix="_wo_na"
+                    )
                     .with_columns(
-                        percentage_wo_na=pl.when(pl.col("percentage_wo_na").is_null())
+                        percentage_wo_na=pl.when(
+                            pl.col("percentage_wo_na").is_null()
+                        )
                         .then(pl.lit("NÃO INCLUÍDO"))
                         .otherwise(pl.col("percentage_wo_na"))
                     )
@@ -2712,8 +2802,12 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     kwargs["facet_row"] = compare_by_col
 
                 if max_y is not None:
-                    kwargs["range_y"] = [0, max_y] if orientation == "v" else [0, None]
-                    kwargs["range_x"] = [0, max_y] if orientation == "h" else [0, None]
+                    kwargs["range_y"] = (
+                        [0, max_y] if orientation == "v" else [0, None]
+                    )
+                    kwargs["range_x"] = (
+                        [0, max_y] if orientation == "h" else [0, None]
+                    )
 
                 fig = px.bar(
                     df_plot,
@@ -2722,9 +2816,12 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     # height=1000,
                     color_discrete_sequence=palette,  # [NOTE] Ver https://plotly.com/python/discrete-color/
                     barmode="group",
-                    title=title if title else f"Respostas à pergunta {question_name}",
+                    title=title
+                    if title
+                    # else f"Respostas à pergunta {question_name}",
+                    else name_dict.get(question_name),
                     # title=f"{questions_dict.get(question_name)}", # [TODO] Add function to get the full question from the question name
-                    subtitle=subtitle,
+                    subtitle=f"[{question_name}] " + subtitle,
                     hover_data=hover_dict,
                     hover_name="answer",
                     labels=dict(
@@ -2765,17 +2862,23 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     print("\nAnswer map:", answer_map)
                     print(
                         "\nOptions on plot:",
-                        sorted(df_plot.select("answer").unique().to_series().to_list()),
+                        sorted(
+                            df_plot.select("answer").unique().to_series().to_list()
+                        ),
                     )
         return fig
+
 
     def get_answer_map_per_question(question_name):
         assertion_map = ASSERTION_MAP
         new_to_list_of_old = assertion_map.get(question_name, {}).get("map", {})
         old_to_new = {
-            value: key for key, values in new_to_list_of_old.items() for value in values
+            value: key
+            for key, values in new_to_list_of_old.items()
+            for value in values
         }
         return old_to_new
+
 
     def get_answer_maps_per_question(question_name):
         # Handles assertion_map entries that are a dict or a list of dicts
@@ -2791,7 +2894,9 @@ def _(ASSERTION_MAP, np, pl, print, px):
                 if "map" in e:
                     new_to_list_of_old = e["map"]
                     old_to_new = {
-                        v: k for k, vals in new_to_list_of_old.items() for v in vals
+                        v: k
+                        for k, vals in new_to_list_of_old.items()
+                        for v in vals
                     }
                     answer_maps.append(old_to_new)
                 else:
@@ -2799,6 +2904,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     answer_maps.append({})
 
         return answer_maps
+
 
     def get_answer_order_per_question(question_name):
         assertion_map = ASSERTION_MAP
@@ -2813,6 +2919,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
             ]
 
         return assertion_map.get(question_name, {}).get("order", ["NA"])
+
 
     def get_answer_orders_per_question(question_name):
         assertion_map = ASSERTION_MAP
@@ -2844,6 +2951,7 @@ def _(ASSERTION_MAP, np, pl, print, px):
                     answer_orders.append(["NA"])
 
         return answer_orders
+
 
     def enrich_first_and_last_time(df_long):
         """Enriches the dataframe with the first and last time for each family.
@@ -2890,7 +2998,8 @@ def _(ASSERTION_MAP, np, pl, print, px):
 
         # Remove families that only have one time difference between the first and last time (this filters out 57 families, leaving only the 616 remaining families)
         df_long_periods = df_long_periods.filter(
-            pl.col("time_last").cast(pl.Int8) - pl.col("time_first").cast(pl.Int8) > 1
+            pl.col("time_last").cast(pl.Int8) - pl.col("time_first").cast(pl.Int8)
+            > 1
         )
 
         return df_long_periods
