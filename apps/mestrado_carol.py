@@ -164,14 +164,11 @@ def _(mo):
     return
 
 
-@app.cell
-def _(mo):
-    mo.callout("[TODO] Adicionar colunas sem NA", kind="info")
-    return
-
-
 @app.cell(hide_code=True)
-def _(df_plot_variables, mo, pl, questions):
+def _(name_dict):
+    THRESH_NA = 50
+
+
     def na_table(
         df_long,
         question_names: list,
@@ -180,42 +177,169 @@ def _(df_plot_variables, mo, pl, questions):
         filter_by_order=False,
     ):
         from great_tables import GT, md, style, loc
+        import polars as pl
 
-        # for question_name in question_names:
-        agg_cols = ["time", "answer", "question"]
-
-        df_plot = df_long
-        count_col_name = "count"
-        df_plot = df_plot.select(agg_cols).group_by(agg_cols).len(count_col_name)
-
-        df_pct = (
-            df_plot.with_columns(
+        # Aggregate by question, time, and answer, and count occurrences
+        df_plot = (
+            df_long.filter(pl.col("question").is_in(question_names))
+            .group_by(["question", "time", "answer"])
+            .len()
+            .with_columns(
+                total_per_question_time=pl.col("len")
+                .sum()
+                .over(["question", "time"])
+            )
+            .with_columns(
                 percentage=(
-                    pl.col(count_col_name)
-                    / pl.col(count_col_name).sum().over("time", "question")
-                    * 100
+                    pl.col("len") / pl.col("total_per_question_time") * 100
                 )
             )
+            .select(["question", "time", "answer", "len", "percentage"])
+        )
+
+        #
+        first_df = df_plot.filter(pl.col("time") == "FIRST")
+        last_df = df_plot.filter(pl.col("time") == "LAST")
+        _df = (
+            first_df.join(
+                last_df,
+                on=["question", "answer"],
+                how="full",
+                # suffixes=("_FIRST", "_LAST"),
+            )
+            .fill_null(0)
             .filter(pl.col("answer") == "NA")
-            .select("question", "time", count_col_name, "percentage")
-            .sort(
-                "percentage", "question", "time", descending=[True, False, False]
+            .select(
+                pl.col.question,
+                # pl.col.answer,
+                pl.col.len.alias("count_first"),
+                pl.col.percentage.alias("pct_first"),
+                pl.col.len_right.alias("count_last"),
+                pl.col.percentage_right.alias("pct_last"),
             )
         )
 
-        return (
-            GT(df_pct)
+        # Handle questions without NAs
+        all_questions = set(question_names)
+        questions_in_df = set(_df["question"].to_list())
+        missing_questions = list(all_questions - questions_in_df)
+
+        missing_questions
+        if missing_questions:
+            missing_data = pl.DataFrame(
+                {
+                    "question": missing_questions,
+                    # "answer": ["NA"] * len(missing_questions),
+                    "count_first": [0] * len(missing_questions),
+                    "pct_first": [0.0] * len(missing_questions),
+                    "count_last": [0] * len(missing_questions),
+                    "pct_last": [0.0] * len(missing_questions),
+                }
+            ).with_columns(
+                count_first=pl.col.count_first.cast(pl.UInt32),
+                count_last=pl.col.count_last.cast(pl.UInt32),
+            )
+            _df = pl.concat([_df, missing_data])
+
+        _df = _df.sort("count_first", descending=True)
+        question_name_df = pl.DataFrame(
+            dict(key=name_dict.keys(), value=name_dict.values())
+        )
+        _df = (
+            _df.join(
+                question_name_df, left_on="question", right_on="key", how="left"
+            )
+            .with_columns(
+                question_id=pl.col("question"),
+                question=pl.col("value"),
+            )
+            .drop("value")
+            # .rename({"value": "question"})
+        )
+        # Create the GreatTable
+        gt_table = (
+            GT(_df)
+            .cols_move_to_start(columns=["question_id", "question"])
+            .tab_header(
+                title=md("Percentual de NAs por Pergunta"),
+                subtitle=md("Percentual de respostas NA por pergunta e tempo"),
+            )
+            .cols_label(
+                question=md("Pergunta"),
+                question_id=md("ID da Pergunta"),
+                count_first=md("Núm. de NAs"),
+                count_last=md("Núm. de NAs"),
+                pct_first=md("% de NAs"),
+                pct_last=md("% de NAs"),
+                # **{
+                #     col: md(col.replace("@", " @ "))
+                #     for col in _df.columns
+                #     if col != "question"
+                # },
+            )
+            .tab_spanner(
+                label=md("**Tempo INICIAL**"),
+                columns=[
+                    "count_first",
+                    "pct_first",
+                ],
+            )
+            .tab_spanner(
+                label=md("**Tempo FINAL**"),
+                columns=[
+                    "count_last",
+                    "pct_last",
+                ],
+            )
             .fmt_number(
-                columns=["percentage"],
+                columns=["pct_first", "pct_last"],
                 decimals=2,
                 pattern="{x}%",
             )
             .opt_stylize(style=1, color="blue")
+            .tab_style(
+                style=style.text(size="14px"),
+                locations=loc.body(columns=["question_id", "question"]),
+            )
+            .tab_style(
+                style=style.text(weight="bold"),
+                locations=loc.body(columns=["question"]),
+            )
+            .tab_style(
+                style=style.text(align="right"),
+                locations=loc.body(
+                    columns=[
+                        "count_first",
+                        "count_last",
+                        "pct_first",
+                        "pct_last",
+                    ]
+                ),
+            )
+            # .tab_style(
+            #     style.fill("#bde3c0"),
+            #     loc.body(
+            #         # columns=cs.starts_with("cha"),
+            #         rows=pl.col("pct_first")<THRESH_NA,
+            #     ),
+            # )
+            .tab_style(
+                style.fill("#F5C8B4"),
+                loc.body(
+                    # columns=cs.starts_with("cha"),
+                    rows=(pl.col("pct_first") > THRESH_NA)
+                    | (pl.col("pct_last") > THRESH_NA),
+                ),
+            )
         )
 
+        return gt_table
+    return (na_table,)
 
-    gt = na_table(df_plot_variables, questions)
-    mo.accordion({"Tabela": gt})
+
+@app.cell
+def _(df_plot_variables, na_table, questions):
+    na_table(df_plot_variables, questions)
     return
 
 
