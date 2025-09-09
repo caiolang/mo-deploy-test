@@ -338,8 +338,8 @@ def _(name_dict):
 
 
 @app.cell
-def _(df_plot_variables, na_table, questions):
-    na_table(df_plot_variables, questions)
+def _(df_plot_variables, mo, na_table, questions):
+    mo.accordion({"Tabela de NAs": na_table(df_plot_variables, questions)})
     return
 
 
