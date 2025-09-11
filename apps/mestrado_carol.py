@@ -879,440 +879,6 @@ def _(df_plot_variables, pl, plot_answer_histogram, px):
             figs_list.append(fig)
 
         return figs_list
-    return plot_histograms_income, title_dict
-
-
-@app.cell
-def _(mo):
-    pct_5 = mo.ui.switch(value=True, label=f"Percentual")
-    cum_5 = mo.ui.switch(value=True, label=f"Cumulativo")
-    mo.hstack([cum_5, pct_5], justify="start")
-    return cum_5, pct_5
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""##### Alcoolismo""")
-    return
-
-
-@app.cell(hide_code=True)
-def _(cum_5, mo, pct_5, plot_histograms_income):
-    mo.hstack(
-        plot_histograms_income(
-            "alcoholism", percentage=pct_5.value, cum=cum_5.value
-        )
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""##### Drogadição""")
-    return
-
-
-@app.cell
-def _(cum_5, mo, pct_5, plot_histograms_income):
-    mo.hstack(
-        plot_histograms_income(
-            "drug_addiction", percentage=pct_5.value, cum=cum_5.value
-        )
-    )
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""#### Violência contra mulheres""")
-    return
-
-
-@app.cell
-def _(cum_5, mo, pct_5, plot_histograms_income):
-    mo.hstack(
-        plot_histograms_income(
-            "violence_women", percentage=pct_5.value, cum=cum_5.value
-        )
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""#### Violência contra crianças""")
-    return
-
-
-@app.cell
-def _(cum_5, mo, pct_5, plot_histograms_income):
-    mo.hstack(
-        plot_histograms_income(
-            "violence_children", percentage=pct_5.value, cum=cum_5.value
-        )
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(df_plot_variables, pl, plot_answer_histogram_, title_dict):
-    _col = "drug_addiction"
-    _val = "Sim"
-    _df = df_plot_variables.filter(pl.col(_col) == _val)
-    _percentage = True
-    _cum = True
-
-    plot_answer_histogram_(
-        _df,
-        question_name="Income",
-        title="Distribuição de renda (Income)",
-        subtitle=f"{title_dict.get(_col)}: {_val}",
-        # color_palette=_palette_dict.get(_val, px.colors.qualitative.Pastel),
-        bin_count=10,
-        y_max=120 if _percentage else None,
-        upper_limit=10_000,
-        percentage=_percentage,
-        cumulative=_cum,
-    )
-    return
-
-
-@app.cell
-def _(pl, px):
-    def plot_answer_histogram_(
-        df,
-        question_name,
-        bin_count=10,
-        title=None,
-        upper_limit=100_000,
-        show_values=True,
-        cumulative=False,
-        subtitle=None,
-        # group_by=None,
-        color_palette=None,
-        y_max=None,
-        percentage=False,
-    ):
-        """
-        Create a histogram visualization of the 'answer' column data.
-
-        Parameters:
-        - df: Polars DataFrame containing the data
-        - question_name: Optional filter to show only specific question
-        - title: Optional custom title for the plot
-        - color_palette: Optional color palette for the bars
-        - percentage: If True, show percentages instead of counts
-
-        Returns:
-        - Plotly figure object
-        """
-
-        conditions = (pl.col("question") == question_name) & (
-            pl.col("answer") != "NA"
-        )
-
-        select_cols = [pl.col("answer").cast(pl.Float32)]
-
-        # Filtra por question
-        df_filtered = df.filter(conditions)
-
-        df_filtered = df_filtered.select(select_cols)
-
-        # Aplica o limite superior (upper_limit) para eliminar outliers, caso informado
-        if upper_limit:
-            df_filtered = df_filtered.filter(pl.col("answer") <= upper_limit)
-
-        # Gera os dados de histograma usando .hist()
-        hist_data = pl.Series(df_filtered).hist(bin_count=10)
-        # [TODO] Fazer uma função de bin própria que receba o módulo que cada bin deve ter (ex.: cada bin é R$500 ou R$1000 a mais)
-        # hist_data = pl.Series(df_filtered).hist()
-
-        # Calcula percentuais
-        total_count = hist_data.select("count").sum().item()
-
-        hist_data = hist_data.with_columns(
-            (pl.col("count") / total_count * 100).alias("percentage")
-        )
-
-        hist_data = hist_data.with_columns(
-            cum_count=pl.col("count").cum_sum(),
-            cum_pct=pl.col("percentage").cum_sum(),
-            # cum_pct=pl.col("percentage").sort("breakpoint").cum_sum(),
-        )
-
-        labels_dict = {
-            "breakpoint": "Limite superior",
-            "percentage": "Percentual de famílias",
-            "count": "Núm de famílias",
-            "cum_count": "Núm de famílias cumulativo",
-            "cum_pct": "% de famílias cumulativo",
-        }
-
-        # Configura colunas
-        if percentage:
-            if cumulative:
-                y_column = "cum_pct"
-            else:
-                y_column = "percentage"
-            # y_label = "Percentual de famílias"
-            # y_title = "Percentual de famílias no bin"
-        else:
-            if cumulative:
-                y_column = "cum_count"
-            else:
-                y_column = "count"
-            # y_label = "Núm de famílias"
-            # y_title = "Número de famílias no bin"
-
-        y_label = labels_dict.get(y_column)
-        y_title = y_label + " no bin"
-        # print(hist_data.head())
-
-        # Gera a imagem do histograma
-
-        if cumulative:
-            title += " (Cumulative)"
-
-        fig = px.bar(
-            hist_data,
-            # x="category",
-            x="breakpoint",
-            y=y_column,
-            title=title
-            or f"Distribution of Answers{' for ' + question_name if question_name else ''}",
-            subtitle=subtitle or "",
-            color_discrete_sequence=color_palette or px.colors.qualitative.Set3,
-            labels=labels_dict,
-            hover_data=[
-                "count",
-                "percentage",
-                "cum_count",
-                "cum_pct",
-            ],
-        )
-
-        x_kwargs = dict(
-            tickformat=",.2f",
-            tickprefix="R$ ",
-            tickangle=-45,
-            title="Limit superior do bin",
-            range=[0, upper_limit],
-        )
-
-        y_kwargs = dict(
-            title=y_title,
-            range=[0, y_max] if y_max else None,
-        )
-
-        # Update layout
-        fig.update_layout(
-            xaxis=x_kwargs,
-            yaxis=y_kwargs,
-        )
-
-        if show_values:
-            if percentage:
-                fig.update_traces(texttemplate="%{y:.1f}%", textposition="outside")
-            else:
-                fig.update_traces(texttemplate="%{y}", textposition="outside")
-
-        # fig.show()
-
-        return fig
-    return (plot_answer_histogram_,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""##### Drogadição e Alcoolismo""")
-    return
-
-
-@app.cell(hide_code=True)
-def _(cum_5, df_plot_variables, mo, pct_5, pl, plot_answer_histogram, px):
-    _df_plot = df_plot_variables.filter(
-        (pl.col("alcoholism") == "Sim") & (pl.col("drug_addiction") == "Sim")
-    )
-
-    _df_plot_baseline = df_plot_variables.filter(
-        (pl.col("alcoholism") == "Não") & (pl.col("drug_addiction") == "Não")
-    )
-
-    _figs = []
-
-    # for cum in [False, True]:
-    for _df, _subtitle, _color_idx in [
-        (_df_plot, "SIM para Drogadição e Alcoolismo", 1),
-        (_df_plot_baseline, "NÃO para Drogadição e Alcoolismo", 2),
-    ]:
-        _fig = plot_answer_histogram(
-            _df,
-            question_name="Income",
-            title="Distribuição de renda (Income)",
-            subtitle=_subtitle,
-            color_palette=[px.colors.qualitative.Pastel[_color_idx]],
-            bin_count=10,
-            y_max=120 if pct_5.value else None,
-            upper_limit=10_000,
-            percentage=pct_5.value,
-            cumulative=cum_5.value,
-        )
-        _figs.append(_fig)
-
-    mo.hstack(_figs)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""##### Violências (mulher e criança)""")
-    return
-
-
-@app.cell
-def _(cum_5, df_plot_variables, mo, pct_5, pl, plot_answer_histogram, px):
-    _df_plot = df_plot_variables.filter(
-        (pl.col("violence_women") == "Sim")
-        & (pl.col("violence_children") == "Sim")
-        & (pl.col("time") == "FIRST")
-        # & (pl.col("time") == "LAST")
-        & (pl.col("question") == "Income")
-    )
-
-    _df_plot_baseline = df_plot_variables.filter(
-        (pl.col("violence_women") == "Não")
-        & (pl.col("violence_children") == "Não")
-        & (pl.col("time") == "FIRST")
-        # & (pl.col("time") == "LAST")
-        & (pl.col("question") == "Income")
-    )
-
-    _figs = []
-
-    # for cum in [False, True]:
-    for _df, _subtitle, _color_idx in [
-        (_df_plot, "SIM para Violências (mulher e criança)", 10),
-        (_df_plot_baseline, "NÃO para Violências (mulher e criança)", 9),
-    ]:
-        _fig = plot_answer_histogram(
-            _df,
-            question_name="Income",
-            title="Distribuição de renda (Income)",
-            subtitle=_subtitle,
-            color_palette=[px.colors.qualitative.Pastel[_color_idx]],
-            bin_count=10,
-            y_max=120 if pct_5.value else None,
-            upper_limit=10_000,
-            percentage=pct_5.value,
-            cumulative=cum_5.value,
-        )
-        _figs.append(_fig)
-
-    mo.hstack(_figs)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""<!-- #### Teste usando Altair -->""")
-    return
-
-
-@app.cell
-def _():
-    # _df_plot = df_plot_variables.filter(
-    #     (pl.col("violence_women") == "Sim")
-    #     & (pl.col("violence_children") == "Sim")
-    #     & (pl.col("time") == "FIRST")
-    #     & (pl.col("question") == "Income")
-    # )
-
-    # _df_plot_baseline = df_plot_variables.filter(
-    #     (pl.col("violence_women") == "Não")
-    #     & (pl.col("violence_children") == "Não")
-    #     & (pl.col("time") == "FIRST")
-    #     & (pl.col("question") == "Income")
-    # )
-
-    # _max_y = 100
-
-    # _figs = []
-
-    # # for cum in [False, True]:
-    # for _df, _subtitle, _color_idx in [
-    #     (_df_plot, "SIM para Violências (mulher e criança)", 10),
-    #     (_df_plot_baseline, "NÃO para Violências (mulher e criança)", 9),
-    # ]:
-    #     _fig = (
-    #         alt.Chart(_df)  # <-- replace with data
-    #         .mark_bar()
-    #         .encode(
-    #             x=alt.X(
-    #                 "answer",
-    #                 type="quantitative",
-    #                 bin=True,
-    #                 title="Income",
-    #             ),
-    #             y=alt.Y(
-    #                 "count()",
-    #                 type="quantitative",
-    #                 title="Number of records",
-    #                 scale=alt.Scale(domain=[0, _max_y]),
-    #             ),
-    #             tooltip=[
-    #                 alt.Tooltip(
-    #                     "answer",
-    #                     type="quantitative",
-    #                     # bin=True,
-    #                     bin=alt.Bin(step=BIN_SIZE),
-    #                     title="Income",
-    #                     format=",.2f",
-    #                 ),
-    #                 alt.Tooltip(
-    #                     "count()",
-    #                     type="quantitative",
-    #                     format=",.0f",
-    #                     title="Number of records",
-    #                 ),
-    #             ],
-    #         )
-    #         .properties(
-    #             width="container",
-    #             title=alt.TitleParams(text="Income", subtitle=_subtitle),
-    #         )
-    #         .configure_view(stroke=None)
-    #     )
-    #     _figs.append(_fig)
-
-    # mo.hstack(_figs)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""##### Baseline com todos""")
-    return
-
-
-@app.cell(hide_code=True)
-def _(cum_5, df_plot_variables, pct_5, plot_answer_histogram, px):
-    plot_answer_histogram(
-        df_plot_variables,
-        question_name="Income",
-        title="Distribuição de renda (Income)",
-        subtitle="Todas as respostas",
-        color_palette=[px.colors.qualitative.Pastel[3]],
-        bin_count=10,
-        y_max=120 if pct_5.value else None,
-        upper_limit=10_000,
-        percentage=pct_5.value,
-        cumulative=cum_5.value,
-    )
     return
 
 
@@ -1392,7 +958,6 @@ def _(
     max_y_slider,
     mo,
     pl,
-    print,
 ):
     _col_to_use = income_col_to_use.value
     # _col_to_use = "IncomePerCapita"
@@ -1414,7 +979,7 @@ def _(
     _palette_pattern = dict(
         Não="\\",
         NA="+",
-        Sim=".",
+        Sim="x",
     )
     _color_first = "purple"
     _color_last = "blue"
@@ -1493,8 +1058,6 @@ def _(
     if cb_first_time.value:
         if _group_by_col:
             for group_name, group_df in _first_data.group_by(_group_by_col):
-                # print(group_df)
-                print(group_name[0])
                 _fig.add_trace(
                     go.Histogram(
                         name=f"Tempo inicial, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
@@ -1510,9 +1073,9 @@ def _(
                                 bgcolor=lighten_color(
                                     _color_first
                                 ),  # Background color of pattern
-                                size=10,  # Size of pattern elements
+                                size=15,  # Size of pattern elements
                                 solidity=0.1,  # Opacity of pattern
-                                fgopacity=0.5,
+                                fgopacity=1,
                             ),
                             line=dict(
                                 color=_color_first,  # Contour color
@@ -1562,8 +1125,6 @@ def _(
     if cb_last_time.value:
         if _group_by_col:
             for group_name, group_df in _last_data.group_by(_group_by_col):
-                # print(group_df)
-                print(group_name[0])
                 _fig.add_trace(
                     go.Histogram(
                         name=f"Tempo final, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
@@ -1692,6 +1253,14 @@ def _(mo):
 
 
 @app.cell
+def _(mo):
+    pct_5 = mo.ui.switch(value=True, label=f"Percentual")
+    cum_5 = mo.ui.switch(value=True, label=f"Cumulativo")
+    mo.hstack([cum_5, pct_5], justify="start")
+    return (pct_5,)
+
+
+@app.cell
 def _(df_plot_variables, mo, pct_5, pl, plot_variables, px):
     _columns = [
         "drug_addiction",
@@ -1794,87 +1363,6 @@ def _(df_plot_variables, mo, pct_5, pl, plot_variables, px):
 
     mo.hstack(_figs)
     return
-
-
-@app.cell
-def _(mo):
-    mo.callout(
-        """DOING: Income per capita - filtrar drogadição e violências""",
-        kind="info",
-    )
-    return
-
-
-@app.cell
-def _():
-    return
-
-
-@app.cell
-def _(BIN_SIZE, alt, df_long, df_long_first, pl):
-    _data = (
-        df_long.filter(
-            (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
-        )
-        .select(
-            "id_family_datalake",
-            pl.col("answer").cast(pl.Int32).alias("num_family_members"),
-        )
-        .join(
-            df_long_first.filter(
-                (pl.col("question") == "Income")
-                & (pl.col("time") == 0)
-                & (pl.col("answer") != "NA")
-            ).select(
-                "id_family_datalake",
-                pl.col("answer").cast(pl.Float64).alias("income"),
-                # "time",
-            ),
-            on="id_family_datalake",
-        )
-        .with_columns(
-            income_per_capita=pl.col("income") / pl.col("num_family_members")
-        )
-    )
-
-    _chart = (
-        alt.Chart(_data)  # <-- replace with data
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "income_per_capita",
-                type="quantitative",
-                bin=True,
-                title="income_per_capita",
-            ),
-            y=alt.Y("count()", type="quantitative", title="Number of records"),
-            tooltip=[
-                alt.Tooltip(
-                    "income_per_capita",
-                    type="quantitative",
-                    bin=alt.Bin(step=BIN_SIZE),
-                    title="income_per_capita",
-                    format=",.2f",
-                ),
-                alt.Tooltip(
-                    "count()",
-                    type="quantitative",
-                    format=",.0f",
-                    title="Number of records",
-                ),
-            ],
-        )
-        .properties(width="container")
-        .configure_view(stroke=None)
-    )
-    _chart
-    return
-
-
-@app.cell
-def _():
-    BIN_SIZE = 500
-    return (BIN_SIZE,)
 
 
 @app.cell(hide_code=True)
@@ -2956,7 +2444,7 @@ def _():
     import plotly.graph_objects as go
     from rich import print
     import numpy as np
-    return GT, alt, go, loc, md, np, pl, print, px, style
+    return GT, go, loc, md, np, pl, print, px, style
 
 
 @app.cell
