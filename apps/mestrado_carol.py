@@ -936,6 +936,7 @@ def _(mo):
 def _():
     import matplotlib.colors as mcolors
 
+
     def lighten_color(hex_color, amount=0.5):
         # amount: 0 = original, 1 = white
         c = mcolors.to_rgb(hex_color)
@@ -963,16 +964,16 @@ def _(
     # _col_to_use = "IncomePerCapita"
 
     _palette = dict(
-        blue="#1f77b4",  # (blue)
-        orange="#ff7f0e",  # (orange)
-        green="#2ca02c",  # (green)
-        red="#d62728",  # (red)
-        purple="#9467bd",  # (purple)
-        brown="#8c564b",  # (brown)
-        pink="#e377c2",  # (pink)
-        gray="#7f7f7f",  # (gray)
-        olive="#bcbd22",  # (olive)
-        cyan="#17becf",  # (cyan)
+        NA="#7f7f7f",  # (gray)
+        Não="#1f77b4",  # (blue)
+        Sim="#ff7f0e",  # (orange)
+        # green="#2ca02c",  # (green)
+        # red="#d62728",  # (red)
+        # purple="#9467bd",  # (purple)
+        # brown="#8c564b",  # (brown)
+        # pink="#e377c2",  # (pink)
+        # olive="#bcbd22",  # (olive)
+        # cyan="#17becf",  # (cyan)
     )
 
     # ['', '/', '\\', 'x', '-', '|', '+', '.']
@@ -982,7 +983,10 @@ def _(
         Sim="x",
     )
     _color_first = "purple"
-    _color_last = "blue"
+    _color_last = "green"
+
+    _shape_first = "-"
+    _shape_last = "x"
 
 
     # [TODO] FILTER CONDITIONS
@@ -1060,25 +1064,26 @@ def _(
             for group_name, group_df in _first_data.group_by(_group_by_col):
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo inicial, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                        name=f"Tempo <b>inicial</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
                         marker=dict(
                             pattern=dict(
-                                shape=_palette_pattern.get(
-                                    group_name[0]
-                                ), 
+                                # shape=_palette_pattern.get(
+                                #     group_name[0]
+                                # ),
+                                shape=_shape_first,
                                 fillmode="overlay",  # "overlay" or "replace"
                                 fgcolor=lighten_color(
-                                    _color_first, 0.1
+                                    _palette.get(group_name[0]), 0.1
                                 ),  # Foreground color of pattern
                                 bgcolor=lighten_color(
-                                    _color_first
+                                    _palette.get(group_name[0])
                                 ),  # Background color of pattern
                                 size=15,  # Size of pattern elements
                                 solidity=0.1,  # Opacity of pattern
                                 fgopacity=1,
                             ),
                             line=dict(
-                                color=_color_first,  # Contour color
+                                color=_palette.get(group_name[0]),  # Contour color
                                 width=1,  # Contour width in pixels
                             ),
                         ),
@@ -1096,13 +1101,16 @@ def _(
         else:
             _fig.add_trace(
                 go.Histogram(
-                    name="Tempo inicial",
+                    name="Tempo <b>inicial</b>",
                     marker=dict(
                         pattern=dict(
-                            shape="-",
+                            # shape="-",
+                            shape=_shape_first,
                             fgcolor=lighten_color(_color_first, 0.1),
                             bgcolor=lighten_color(_color_first),
-                            fgopacity=0.0,
+                            size=15,  # Size of pattern elements
+                            solidity=0.1,  # Opacity of pattern
+                            fgopacity=1,
                         ),
                         line=dict(
                             color=_color_first,  # Contour color
@@ -1120,32 +1128,33 @@ def _(
                     hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                 ),
             )
-        _subtitle_l.append("Tempo inicial")
+        _subtitle_l.append("<b>Tempo inicial</b>")
 
     if cb_last_time.value:
         if _group_by_col:
             for group_name, group_df in _last_data.group_by(_group_by_col):
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo final, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                        name=f"Tempo <b>final</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
                         marker=dict(
                             pattern=dict(
-                                shape=_palette_pattern.get(
-                                    group_name[0]
-                                ),
+                                shape=_shape_last,
+                                # shape=_palette_pattern.get(
+                                #     group_name[0]
+                                # ),
                                 fillmode="overlay",  # "overlay" or "replace"
                                 fgcolor=lighten_color(
-                                    _color_last, 0.1
+                                    _palette.get(group_name[0]), 0.1
                                 ),  # Foreground color of pattern
                                 bgcolor=lighten_color(
-                                    _color_last
+                                    _palette.get(group_name[0])
                                 ),  # Background color of pattern
                                 size=10,  # Size of pattern elements
                                 solidity=0.1,  # Opacity of pattern
                                 fgopacity=0.5,
                             ),
                             line=dict(
-                                color=_color_last,  # Contour color
+                                color=_palette.get(group_name[0]),  # Contour color
                                 width=1,  # Contour width in pixels
                             ),
                         ),
@@ -1163,13 +1172,16 @@ def _(
         else:
             _fig.add_trace(
                 go.Histogram(
-                    name="Tempo final",
+                    name="Tempo <b>final</b>",
                     marker=dict(
                         pattern=dict(
-                            shape="-",
+                            # shape="-",
+                            shape=_shape_last,
                             fgcolor=lighten_color(_color_last, 0.1),
                             bgcolor=lighten_color(_color_last),
-                            fgopacity=0.0,
+                            size=15,  # Size of pattern elements
+                            solidity=0.1,  # Opacity of pattern
+                            fgopacity=1,
                         ),
                         line=dict(
                             color=_color_last,  # Contour color
@@ -1187,9 +1199,9 @@ def _(
                     hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                 ),
             )
-        _subtitle_l.append("Tempo final")
+        _subtitle_l.append("<b>Tempo final</b>")
 
-    _subtitle = (' e ').join(_subtitle_l)
+    _subtitle = (" e ").join(_subtitle_l)
     if _group_by_col:
         _subtitle += f" agrupado por <b>{income_group_by_cols.selected_key}</b>"
 
@@ -1214,7 +1226,7 @@ def _(
             yanchor="bottom",
         )
     )
-    _fig.update_layout(width=900)  # Set width in pixels
+    _fig.update_layout(width=1000)  # Set width in pixels
 
     mo.vstack(
         [
