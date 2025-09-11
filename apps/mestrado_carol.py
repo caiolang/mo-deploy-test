@@ -1331,28 +1331,27 @@ def _(mo):
         label="Valor máximo do eixo X",
         value=10_000,
     )
-    # income_group_by_cols = mo.ui.dictionary(
-    #     dict(
-    #         drug_addiction=mo.ui.checkbox(label="Drogadição [WIP]"),
-    #         alcoholism=mo.ui.checkbox(label="Alcoolismo [WIP]"),
-    #     )
-    # )
     income_group_by_cols = mo.ui.dropdown(
         options={
             "Drogadição": "drug_addiction",
+            "Violência contra mulheres": "violence_women",
+            "Violência contra crianças": "violence_children",
+            "Violência contra crianças e mulheres": "violences",
             "Alcoolismo": "alcoholism",
             "Drogadição + Alcoolismo": "drugs",
         },
+        label="Escolha a variável de agrupamento: ",
+        value="Drogadição",
     )
-    # drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
+
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
     cb_last_time = mo.ui.checkbox(label="Tempo final")
 
     # income / per capita
     income_col_to_use = mo.ui.dropdown(
+        label="Escolha a variável principal:",
         options={"Renda": "Income", "Renda per Capita": "IncomePerCapita"},
         value="Renda",
-        label="Escolha a variável:",
     )
     # [NICE TO HAVE] percentage e cumulative
     return (
@@ -1374,11 +1373,6 @@ def _():
         # amount: 0 = original, 1 = white
         c = mcolors.to_rgb(hex_color)
         return mcolors.to_hex([1 - (1 - x) * (1 - amount) for x in c])
-
-    # Example usage:
-    # original = "purple"
-    # toned_down = lighten_color(original, amount=0.5)  # 0.5 is 50% lighter
-    # print(toned_down)
     return (lighten_color,)
 
 
@@ -1414,15 +1408,12 @@ def _(
         olive="#bcbd22",  # (olive)
         cyan="#17becf",  # (cyan)
     )
+
+    # ['', '/', '\\', 'x', '-', '|', '+', '.']
     _palette_pattern = dict(
-        Não="\\",  # (blue)
-        NA="+",  # (gray)
-        Sim=".",  # (orange)
-        # True=".",
-        # False="\\",  # (blue)
-        # Não="#1f77b4",  # (blue)
-        # NA="#7f7f7f",  # (gray)
-        # Sim="#ff7f0e",  # (orange)
+        Não="\\",
+        NA="+",
+        Sim=".",
     )
     _color_first = "purple"
     _color_last = "blue"
@@ -1477,12 +1468,18 @@ def _(
 
     _data = _data.with_columns(
         violences=(pl.col("violence_women") == "Sim")
-         & (pl.col("violence_children") == "Sim"),
+        & (pl.col("violence_children") == "Sim"),
         drugs=(pl.col("drug_addiction") == "Sim")
-         & (pl.col("alcoholism") == "Sim"),
+        & (pl.col("alcoholism") == "Sim"),
     ).with_columns(
-        violences=pl.when(pl.col.violences == True).then(pl.lit("Sim")).when(pl.col.violences == False).then(pl.lit("Não")),
-        drugs=pl.when(pl.col.drugs == True).then(pl.lit("Sim")).when(pl.col.drugs == False).then(pl.lit("Não"))
+        violences=pl.when(pl.col.violences == True)
+        .then(pl.lit("Sim"))
+        .when(pl.col.violences == False)
+        .then(pl.lit("Não")),
+        drugs=pl.when(pl.col.drugs == True)
+        .then(pl.lit("Sim"))
+        .when(pl.col.drugs == False)
+        .then(pl.lit("Não")),
     )
 
     _first_data = _data.filter(pl.col.time == "FIRST")
@@ -1490,11 +1487,7 @@ def _(
 
     _fig = go.Figure()
 
-    # income_group_by_cols = [drugs_addiction_toggle.value]
     _group_by_col = income_group_by_cols.value
-    # _group_by_col = [
-    #     k for (k, v) in income_group_by_cols.items() if v.value is True
-    # ]
 
     if cb_first_time.value:
         if _group_by_col:
@@ -1503,13 +1496,12 @@ def _(
                 print(group_name[0])
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo inicial, {income_group_by_cols.selected_key}: {group_name[0]}",
-                        # marker_color=_palette_first.get(group_name[0]),
+                        name=f"Tempo inicial, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
                         marker=dict(
                             pattern=dict(
                                 shape=_palette_pattern.get(
                                     group_name[0]
-                                ),  # ['', '/', '\\', 'x', '-', '|', '+', '.']
+                                ), 
                                 fillmode="overlay",  # "overlay" or "replace"
                                 fgcolor=lighten_color(
                                     _color_first, 0.1
@@ -1567,11 +1559,50 @@ def _(
         _subtitle_l.append("Tempo inicial")
 
     if cb_last_time.value:
-        _fig.add_trace(
-            go.Histogram(
-                name="Tempo final",
-                # marker_color=_color_last,
-                marker=dict(
+        if _group_by_col:
+            for group_name, group_df in _last_data.group_by(_group_by_col):
+                # print(group_df)
+                print(group_name[0])
+                _fig.add_trace(
+                    go.Histogram(
+                        name=f"Tempo final, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                        marker=dict(
+                            pattern=dict(
+                                shape=_palette_pattern.get(
+                                    group_name[0]
+                                ),
+                                fillmode="overlay",  # "overlay" or "replace"
+                                fgcolor=lighten_color(
+                                    _color_last, 0.1
+                                ),  # Foreground color of pattern
+                                bgcolor=lighten_color(
+                                    _color_last
+                                ),  # Background color of pattern
+                                size=10,  # Size of pattern elements
+                                solidity=0.1,  # Opacity of pattern
+                                fgopacity=0.5,
+                            ),
+                            line=dict(
+                                color=_color_last,  # Contour color
+                                width=1,  # Contour width in pixels
+                            ),
+                        ),
+                        x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                        xbins=dict(
+                            start=0,
+                            end=10_000,
+                            size=bin_size_slider.value
+                            if bin_size_slider.value
+                            else 500,
+                        ),
+                        hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+                    ),
+                )
+        else:
+            _fig.add_trace(
+                go.Histogram(
+                    name="Tempo final",
+                    marker=dict(
                         pattern=dict(
                             shape="-",
                             fgcolor=lighten_color(_color_last, 0.1),
@@ -1583,20 +1614,26 @@ def _(
                             width=1,  # Contour width in pixels
                         ),
                     ),
-                x=pl.Series(_last_data[_col_to_use]).to_numpy(),
-                xbins=dict(
-                    start=0,
-                    end=10_000,
-                    size=bin_size_slider.value if bin_size_slider.value else 500,
+                    x=pl.Series(_last_data[_col_to_use]).to_numpy(),
+                    xbins=dict(
+                        start=0,
+                        end=10_000,
+                        size=bin_size_slider.value
+                        if bin_size_slider.value
+                        else 500,
+                    ),
+                    hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                 ),
-                hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-            ),
-        )
+            )
         _subtitle_l.append("Tempo final")
+
+    _subtitle = (' e ').join(_subtitle_l)
+    if _group_by_col:
+        _subtitle += f" agrupado por <b>{income_group_by_cols.selected_key}</b>"
 
     _fig.update_layout(
         title={
-            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>{(' e ').join(_subtitle_l)}</sup>",
+            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>{_subtitle}</sup>",
             "x": 0.5,  # Center the title
         },
         xaxis_title=_fig_info.get(_col_to_use).get("title", "")
@@ -1609,10 +1646,10 @@ def _(
     _fig.update_layout(
         legend=dict(
             orientation="v",
-            y=0.7,      # Slightly above the plot area
-            x=0.8,       # Centered horizontally
+            y=0.7,  # Slightly above the plot area
+            x=0.8,  # Centered horizontally
             xanchor="center",
-            yanchor="bottom"
+            yanchor="bottom",
         )
     )
     mo.vstack(
@@ -1629,29 +1666,19 @@ def _(
                 [
                     cb_first_time,
                     cb_last_time,
-                    income_col_to_use,
                 ],
                 justify="start",
             ),
             mo.hstack(
-                # drugs_addiction_toggle,
-                # list(
-                #     income_group_by_cols.values(),
-                # ),
-                [income_group_by_cols],
+                [
+                    income_col_to_use,
+                    income_group_by_cols,
+                ],
                 justify="start",
             ),
             _fig,
         ]
     )
-    # _data.describe()
-    # df_long.filter(
-    #         (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
-    #     ).describe()
-    # df_long_first.filter(
-    #             # [NOTE] Pegamos as respostas válidas de renda no primeiro tempo da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
-    #             (pl.col("question") == "Income")
-    #             & (pl.col("answer") != "NA")).describe()
     return
 
 
