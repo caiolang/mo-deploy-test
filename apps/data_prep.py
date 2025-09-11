@@ -237,7 +237,7 @@ def get_col_dict():
             "E_DI_SchoolCurrent_T0": "SchoolCurrent_T0",  # [TODO] Juntar respostas Nao e Não
             "ES_DC_Access_T0": "Access_T0",
             "ES_DC_CulturalEvent_T0": "CulturalEvent_T0",
-            # "IB_HowManyPHHH_T0": "HowManyPHHH_T0",
+            "IB_HowManyPHHH_T0": "HowManyPHHH_T0",
             "R_DC_Income_T0": "Income_T0",
             "R_DI_IncomeWorkS3_T0": "IncomeWorkS3_T0",
             "R_DI_BankAccount_T0": "BankAccount_T0",
