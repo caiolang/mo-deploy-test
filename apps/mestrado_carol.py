@@ -912,13 +912,13 @@ def _(mo):
     )
 
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
-    cb_last_time = mo.ui.checkbox(label="Tempo final")
+    cb_last_time = mo.ui.checkbox(label="Tempo final", value=True)
 
     # income / per capita
     income_col_to_use = mo.ui.dropdown(
         label="Escolha a variável principal:",
         options={"Renda": "Income", "Renda per Capita": "IncomePerCapita"},
-        value="Renda",
+        value="Renda per Capita",
     )
     # [NICE TO HAVE] percentage e cumulative
     return (
@@ -946,6 +946,7 @@ def _():
 
 @app.cell
 def _(
+    GT,
     bin_size_slider,
     cb_first_time,
     cb_last_time,
@@ -957,137 +958,169 @@ def _(
     lighten_color,
     max_x_slider,
     max_y_slider,
-    mo,
+    md,
     pl,
 ):
-    _col_to_use = income_col_to_use.value
-    # _col_to_use = "IncomePerCapita"
+    def get_income_plot():
+        _col_to_use = income_col_to_use.value
+        # _col_to_use = "IncomePerCapita"
 
-    _palette = dict(
-        NA="#7f7f7f",  # (gray)
-        Não="#1f77b4",  # (blue)
-        Sim="#ff7f0e",  # (orange)
-        # green="#2ca02c",  # (green)
-        # red="#d62728",  # (red)
-        # purple="#9467bd",  # (purple)
-        # brown="#8c564b",  # (brown)
-        # pink="#e377c2",  # (pink)
-        # olive="#bcbd22",  # (olive)
-        # cyan="#17becf",  # (cyan)
-    )
-
-    # ['', '/', '\\', 'x', '-', '|', '+', '.']
-    _palette_pattern = dict(
-        Não="\\",
-        NA="+",
-        Sim="x",
-    )
-    _color_first = "purple"
-    _color_last = "green"
-
-    _shape_first = "-"
-    _shape_last = "x"
-
-
-    # [TODO] FILTER CONDITIONS
-    # [TODO] PERCENTAGE AND CUMULATIVE
-
-    _subtitle_l = []
-    _fig_info = {
-        "Income": dict(title="Renda", max_y=400),
-        "IncomePerCapita": dict(title="Renda per Capita", max_y=400),
-    }
-
-
-    # [TODO] add essa coluna no processamento da base?
-    if _col_to_use == "IncomePerCapita":
-        _data = (
-            # 583 famílias tem dados de HowManyPHHH, e 577 tem Income marcado no seu primeiro tempo. Pegamos a intersecção entre esses grupos (537 famílias)
-            df_long.filter(  # [NOTE] Aqui pegamos do df_long porque a pergunta só foi feita no tempo 0
-                (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
-            )
-            .select(
-                "id_family_datalake",
-                pl.col("answer").cast(pl.Int32).alias("num_family_members"),
-            )
-            .join(
-                df_plot_variables.filter(
-                    # [NOTE] Pegamos as respostas válidas de renda no (do primeiro ou último tempo) da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (ex.: para time=="FIRST", usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
-                    (pl.col("question") == "Income") & (pl.col("answer") != "NA")
-                ).select(
-                    "id_family_datalake",
-                    pl.col("answer").cast(pl.Float64).alias("Income"),
-                    "time",
-                    "drug_addiction",
-                    "alcoholism",
-                    "violence_women",
-                    "violence_children",
-                ),
-                on="id_family_datalake",
-                how="inner",
-            )
-            .with_columns(
-                IncomePerCapita=pl.col("Income") / pl.col("num_family_members")
-            )
+        _palette = dict(
+            NA="#7f7f7f",  # (gray)
+            Não="#1f77b4",  # (blue)
+            Sim="#ff7f0e",  # (orange)
+            # green="#2ca02c",  # (green)
+            # red="#d62728",  # (red)
+            # purple="#9467bd",  # (purple)
+            # brown="#8c564b",  # (brown)
+            # pink="#e377c2",  # (pink)
+            # olive="#bcbd22",  # (olive)
+            # cyan="#17becf",  # (cyan)
         )
-    elif _col_to_use == "Income":
-        _data = df_plot_variables.filter(
-            (pl.col("question") == "Income") & (pl.col("answer") != "NA")
-        ).with_columns(pl.col("answer").cast(pl.Float64).alias("Income"))
 
+        # ['', '/', '\\', 'x', '-', '|', '+', '.']
+        _palette_pattern = dict(
+            Não="\\",
+            NA="+",
+            Sim="x",
+        )
+        _color_first = "purple"
+        _color_last = "green"
 
-    _data = _data.with_columns(
-        violences=(pl.col("violence_women") == "Sim")
-        & (pl.col("violence_children") == "Sim"),
-        drugs=(pl.col("drug_addiction") == "Sim")
-        & (pl.col("alcoholism") == "Sim"),
-    ).with_columns(
-        violences=pl.when(pl.col.violences == True)
-        .then(pl.lit("Sim"))
-        .when(pl.col.violences == False)
-        .then(pl.lit("Não")),
-        drugs=pl.when(pl.col.drugs == True)
-        .then(pl.lit("Sim"))
-        .when(pl.col.drugs == False)
-        .then(pl.lit("Não")),
-    )
+        _shape_first = "-"
+        _shape_last = "x"
 
-    _first_data = _data.filter(pl.col.time == "FIRST")
-    _last_data = _data.filter(pl.col.time == "LAST")
+        # [TODO] FILTER CONDITIONS
+        # [TODO] PERCENTAGE AND CUMULATIVE
 
-    _fig = go.Figure()
+        _subtitle_l = []
+        _fig_info = {
+            "Income": dict(title="Renda", max_y=400),
+            "IncomePerCapita": dict(title="Renda per Capita", max_y=400),
+        }
 
-    _group_by_col = income_group_by_cols.value
+        # [TODO] add essa coluna no processamento da base?
+        if _col_to_use == "IncomePerCapita":
+            _data = (
+                # 583 famílias tem dados de HowManyPHHH, e 577 tem Income marcado no seu primeiro tempo. Pegamos a intersecção entre esses grupos (537 famílias)
+                df_long.filter(  # [NOTE] Aqui pegamos do df_long porque a pergunta só foi feita no tempo 0
+                    (pl.col("question") == "HowManyPHHH")
+                    & (pl.col("answer") != "NA")
+                )
+                .select(
+                    "id_family_datalake",
+                    pl.col("answer").cast(pl.Int32).alias("num_family_members"),
+                )
+                .join(
+                    df_plot_variables.filter(
+                        # [NOTE] Pegamos as respostas válidas de renda no (do primeiro ou último tempo) da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (ex.: para time=="FIRST", usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
+                        (pl.col("question") == "Income")
+                        & (pl.col("answer") != "NA")
+                    ).select(
+                        "id_family_datalake",
+                        pl.col("answer").cast(pl.Float64).alias("Income"),
+                        "time",
+                        "drug_addiction",
+                        "alcoholism",
+                        "violence_women",
+                        "violence_children",
+                    ),
+                    on="id_family_datalake",
+                    how="inner",
+                )
+                .with_columns(
+                    IncomePerCapita=pl.col("Income") / pl.col("num_family_members")
+                )
+            )
+        elif _col_to_use == "Income":
+            _data = df_plot_variables.filter(
+                (pl.col("question") == "Income") & (pl.col("answer") != "NA")
+            ).with_columns(pl.col("answer").cast(pl.Float64).alias("Income"))
 
-    if cb_first_time.value:
-        if _group_by_col:
-            for group_name, group_df in _first_data.group_by(_group_by_col):
+        _data = _data.with_columns(
+            violences=(pl.col("violence_women") == "Sim")
+            & (pl.col("violence_children") == "Sim"),
+            drugs=(pl.col("drug_addiction") == "Sim")
+            & (pl.col("alcoholism") == "Sim"),
+        ).with_columns(
+            violences=pl.when(pl.col.violences == True)
+            .then(pl.lit("Sim"))
+            .when(pl.col.violences == False)
+            .then(pl.lit("Não")),
+            drugs=pl.when(pl.col.drugs == True)
+            .then(pl.lit("Sim"))
+            .when(pl.col.drugs == False)
+            .then(pl.lit("Não")),
+        )
+
+        _first_data = _data.filter(pl.col.time == "FIRST")
+        _last_data = _data.filter(pl.col.time == "LAST")
+
+        _fig = go.Figure()
+
+        _group_by_col = income_group_by_cols.value
+
+        if cb_first_time.value:
+            if _group_by_col:
+                for group_name, group_df in _first_data.group_by(_group_by_col):
+                    _fig.add_trace(
+                        go.Histogram(
+                            name=f"Tempo <b>inicial</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                            marker=dict(
+                                pattern=dict(
+                                    # shape=_palette_pattern.get(
+                                    #     group_name[0]
+                                    # ),
+                                    shape=_shape_first,
+                                    fillmode="overlay",  # "overlay" or "replace"
+                                    fgcolor=lighten_color(
+                                        _palette.get(group_name[0]), 0.1
+                                    ),  # Foreground color of pattern
+                                    bgcolor=lighten_color(
+                                        _palette.get(group_name[0])
+                                    ),  # Background color of pattern
+                                    size=15,  # Size of pattern elements
+                                    solidity=0.1,  # Opacity of pattern
+                                    fgopacity=1,
+                                ),
+                                line=dict(
+                                    color=_palette.get(
+                                        group_name[0]
+                                    ),  # Contour color
+                                    width=1,  # Contour width in pixels
+                                ),
+                            ),
+                            x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                            xbins=dict(
+                                start=0,
+                                end=10_000,
+                                size=bin_size_slider.value
+                                if bin_size_slider.value
+                                else 500,
+                            ),
+                            hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+                        ),
+                    )
+            else:
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo <b>inicial</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                        name="Tempo <b>inicial</b>",
                         marker=dict(
                             pattern=dict(
-                                # shape=_palette_pattern.get(
-                                #     group_name[0]
-                                # ),
+                                # shape="-",
                                 shape=_shape_first,
-                                fillmode="overlay",  # "overlay" or "replace"
-                                fgcolor=lighten_color(
-                                    _palette.get(group_name[0]), 0.1
-                                ),  # Foreground color of pattern
-                                bgcolor=lighten_color(
-                                    _palette.get(group_name[0])
-                                ),  # Background color of pattern
+                                fgcolor=lighten_color(_color_first, 0.1),
+                                bgcolor=lighten_color(_color_first),
                                 size=15,  # Size of pattern elements
                                 solidity=0.1,  # Opacity of pattern
                                 fgopacity=1,
                             ),
                             line=dict(
-                                color=_palette.get(group_name[0]),  # Contour color
+                                color=_color_first,  # Contour color
                                 width=1,  # Contour width in pixels
                             ),
                         ),
-                        x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                        x=pl.Series(_first_data[_col_to_use]).to_numpy(),
                         xbins=dict(
                             start=0,
                             end=10_000,
@@ -1098,67 +1131,69 @@ def _(
                         hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                     ),
                 )
-        else:
-            _fig.add_trace(
-                go.Histogram(
-                    name="Tempo <b>inicial</b>",
-                    marker=dict(
-                        pattern=dict(
-                            # shape="-",
-                            shape=_shape_first,
-                            fgcolor=lighten_color(_color_first, 0.1),
-                            bgcolor=lighten_color(_color_first),
-                            size=15,  # Size of pattern elements
-                            solidity=0.1,  # Opacity of pattern
-                            fgopacity=1,
-                        ),
-                        line=dict(
-                            color=_color_first,  # Contour color
-                            width=1,  # Contour width in pixels
-                        ),
-                    ),
-                    x=pl.Series(_first_data[_col_to_use]).to_numpy(),
-                    xbins=dict(
-                        start=0,
-                        end=10_000,
-                        size=bin_size_slider.value
-                        if bin_size_slider.value
-                        else 500,
-                    ),
-                    hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-                ),
-            )
-        _subtitle_l.append("<b>Tempo inicial</b>")
+            _subtitle_l.append("<b>Tempo inicial</b>")
 
-    if cb_last_time.value:
-        if _group_by_col:
-            for group_name, group_df in _last_data.group_by(_group_by_col):
+        if cb_last_time.value:
+            if _group_by_col:
+                for group_name, group_df in _last_data.group_by(_group_by_col):
+                    _fig.add_trace(
+                        go.Histogram(
+                            name=f"Tempo <b>final</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                            marker=dict(
+                                pattern=dict(
+                                    shape=_shape_last,
+                                    # shape=_palette_pattern.get(
+                                    #     group_name[0]
+                                    # ),
+                                    fillmode="overlay",  # "overlay" or "replace"
+                                    fgcolor=lighten_color(
+                                        _palette.get(group_name[0]), 0.1
+                                    ),  # Foreground color of pattern
+                                    bgcolor=lighten_color(
+                                        _palette.get(group_name[0])
+                                    ),  # Background color of pattern
+                                    size=10,  # Size of pattern elements
+                                    solidity=0.1,  # Opacity of pattern
+                                    fgopacity=0.5,
+                                ),
+                                line=dict(
+                                    color=_palette.get(
+                                        group_name[0]
+                                    ),  # Contour color
+                                    width=1,  # Contour width in pixels
+                                ),
+                            ),
+                            x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                            xbins=dict(
+                                start=0,
+                                end=10_000,
+                                size=bin_size_slider.value
+                                if bin_size_slider.value
+                                else 500,
+                            ),
+                            hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+                        ),
+                    )
+            else:
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo <b>final</b>, <i>{income_group_by_cols.selected_key}</i>: <b>{group_name[0]}</b>",
+                        name="Tempo <b>final</b>",
                         marker=dict(
                             pattern=dict(
+                                # shape="-",
                                 shape=_shape_last,
-                                # shape=_palette_pattern.get(
-                                #     group_name[0]
-                                # ),
-                                fillmode="overlay",  # "overlay" or "replace"
-                                fgcolor=lighten_color(
-                                    _palette.get(group_name[0]), 0.1
-                                ),  # Foreground color of pattern
-                                bgcolor=lighten_color(
-                                    _palette.get(group_name[0])
-                                ),  # Background color of pattern
-                                size=10,  # Size of pattern elements
+                                fgcolor=lighten_color(_color_last, 0.1),
+                                bgcolor=lighten_color(_color_last),
+                                size=15,  # Size of pattern elements
                                 solidity=0.1,  # Opacity of pattern
-                                fgopacity=0.5,
+                                fgopacity=1,
                             ),
                             line=dict(
-                                color=_palette.get(group_name[0]),  # Contour color
+                                color=_color_last,  # Contour color
                                 width=1,  # Contour width in pixels
                             ),
                         ),
-                        x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                        x=pl.Series(_last_data[_col_to_use]).to_numpy(),
                         xbins=dict(
                             start=0,
                             end=10_000,
@@ -1169,64 +1204,105 @@ def _(
                         hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                     ),
                 )
-        else:
-            _fig.add_trace(
-                go.Histogram(
-                    name="Tempo <b>final</b>",
-                    marker=dict(
-                        pattern=dict(
-                            # shape="-",
-                            shape=_shape_last,
-                            fgcolor=lighten_color(_color_last, 0.1),
-                            bgcolor=lighten_color(_color_last),
-                            size=15,  # Size of pattern elements
-                            solidity=0.1,  # Opacity of pattern
-                            fgopacity=1,
-                        ),
-                        line=dict(
-                            color=_color_last,  # Contour color
-                            width=1,  # Contour width in pixels
-                        ),
-                    ),
-                    x=pl.Series(_last_data[_col_to_use]).to_numpy(),
-                    xbins=dict(
-                        start=0,
-                        end=10_000,
-                        size=bin_size_slider.value
-                        if bin_size_slider.value
-                        else 500,
-                    ),
-                    hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-                ),
+            _subtitle_l.append("<b>Tempo final</b>")
+
+        _subtitle = (" e ").join(_subtitle_l)
+        if _group_by_col:
+            _subtitle += (
+                f" agrupado por <b>{income_group_by_cols.selected_key}</b>"
             )
-        _subtitle_l.append("<b>Tempo final</b>")
 
-    _subtitle = (" e ").join(_subtitle_l)
-    if _group_by_col:
-        _subtitle += f" agrupado por <b>{income_group_by_cols.selected_key}</b>"
-
-    _fig.update_layout(
-        title={
-            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>{_subtitle}</sup>",
-            "x": 0.5,  # Center the title
-        },
-        xaxis_title=_fig_info.get(_col_to_use).get("title", "")
-        + f" (bins de R${bin_size_slider.value})",
-        yaxis_title="Número de respostas no bin",
-        yaxis=dict(range=[0, max_y_slider.value if max_y_slider.value else 300]),
-        xaxis=dict(range=[0, max_x_slider.value if max_x_slider.value else 300]),
-        bargap=0.1,
-    )
-    _fig.update_layout(
-        legend=dict(
-            orientation="v",
-            y=0.7,  # Slightly above the plot area
-            x=0.8,  # Centered horizontally
-            xanchor="center",
-            yanchor="bottom",
+        _fig.update_layout(
+            title={
+                "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>{_subtitle}</sup>",
+                "x": 0.5,  # Center the title
+            },
+            xaxis_title=_fig_info.get(_col_to_use).get("title", "")
+            + f" (bins de R${bin_size_slider.value})",
+            yaxis_title="Número de respostas no bin",
+            yaxis=dict(
+                range=[0, max_y_slider.value if max_y_slider.value else 300]
+            ),
+            xaxis=dict(
+                range=[0, max_x_slider.value if max_x_slider.value else 300]
+            ),
+            bargap=0.1,
         )
-    )
-    _fig.update_layout(width=1000)  # Set width in pixels
+        _fig.update_layout(
+            legend=dict(
+                orientation="v",
+                y=0.7,  # Slightly above the plot area
+                x=0.8,  # Centered horizontally
+                xanchor="center",
+                yanchor="bottom",
+            )
+        )
+        _fig.update_layout(width=1000)  # Set width in pixels
+
+        # ----
+
+        _gt = (
+            GT(
+                _first_data.filter(
+                    True & (pl.col(_group_by_col) == "Sim")
+                )
+                .select("IncomePerCapita", "Income", "num_family_members")
+                .describe()
+            )
+            .fmt_number(
+                columns=["IncomePerCapita", "Income"],
+                # force_sign=True,
+                decimals=2,
+                # scale_by=100,
+                pattern="R$ {x}",
+                rows=list(range(2, 8)),
+            )
+            .fmt_number(
+                columns=["num_family_members"],
+                # force_sign=True,
+                decimals=2,
+                # scale_by=100,
+                pattern="{x}",
+                rows=list(range(2, 8)),
+            )
+            .fmt_number(
+                columns=["IncomePerCapita", "Income", "num_family_members"],
+                # force_sign=True,
+                decimals=0,
+                # scale_by=100,
+                pattern="{x}",
+                rows=[0, 1],
+            )
+            .tab_header(
+                title=md(f"Tempo inicial: descrição estatística {income_group_by_cols.selected_key}"),
+                # subtitle=md(
+                #     f"Distribuição de respostas por `{describe_by}` no tempo inicial e final"
+                # ),
+            )
+            .cols_label(
+                IncomePerCapita=md("Renda per Capita"),
+                Income=md("Renda"),
+                num_family_members=md("Número de membros da família"),
+            )
+        ) if _group_by_col else None
+
+        return _fig, _gt
+    return (get_income_plot,)
+
+
+@app.cell
+def _(
+    bin_size_slider,
+    cb_first_time,
+    cb_last_time,
+    get_income_plot,
+    income_col_to_use,
+    income_group_by_cols,
+    max_x_slider,
+    max_y_slider,
+    mo,
+):
+    _fig, _gt = get_income_plot()
 
     mo.vstack(
         [
@@ -1253,6 +1329,7 @@ def _(
                 justify="start",
             ),
             _fig,
+            mo.accordion({"Descrição estatística do agrupamento": _gt}) if _gt else "",
         ]
     )
     return
@@ -1267,8 +1344,7 @@ def _(mo):
 @app.cell
 def _(mo):
     pct_5 = mo.ui.switch(value=True, label=f"Percentual")
-    cum_5 = mo.ui.switch(value=True, label=f"Cumulativo")
-    mo.hstack([cum_5, pct_5], justify="start")
+    mo.hstack([pct_5], justify="start")
     return (pct_5,)
 
 
