@@ -1541,55 +1541,75 @@ def _(mo, name_dict):
 
 
 @app.cell
+def _():
+    return
+
+
+@app.cell
 def _(df_long_first, df_long_last, dimension_6, name_dict, pl, px, question_6):
     # [TODO] cores de acordo com a resposta, dependendo da _question_name
-    _igf_color_dict = dict(
-        value=["Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
-        color=["#EB7E69", "#F7F7A1", "#72B7B2", "#3366CC", "#6E899C"],
-        # value=["E1", "Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
-    )
+    def get_parallel_cats():
 
-    _dimension = dimension_6.value
-    _question_name = question_6.value
+    
 
-    _df_colors = pl.DataFrame(_igf_color_dict)
-
-    _df_plot = (
-        df_long_first.filter(pl.col("question") == _question_name)
-        .with_columns(first_answer="answer")
-        .select("id_family_datalake", "question", "first_answer", _dimension)
-        .join(
-            df_long_last.with_columns(last_answer="answer"),
-            on=["id_family_datalake", "question"],
-            how="left",
+    
+        _igf_color_dict = dict(
+            value=["Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
+            color=["#EB7E69", "#F7F7A1", "#72B7B2", "#3366CC", "#6E899C"],
+            # value=["E1", "Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
         )
-        # .with_columns(last_answer="answer")
-        .select(
-            "id_family_datalake",
-            "question",
-            "first_answer",
-            "last_answer",
-            _dimension,
+    
+        _dimension = dimension_6.value
+        _question_name = question_6.value
+    
+        _df_colors = pl.DataFrame(_igf_color_dict)
+    
+        _df_plot = (
+            df_long_first.filter(pl.col("question") == _question_name)
+            .with_columns(first_answer="answer")
+            .select("id_family_datalake", "question", "first_answer", _dimension)
+            .join(
+                df_long_last.with_columns(last_answer="answer"),
+                on=["id_family_datalake", "question"],
+                how="left",
+            )
+            # .with_columns(last_answer="answer")
+            .select(
+                "id_family_datalake",
+                "question",
+                "first_answer",
+                "last_answer",
+                _dimension,
+            )
+        )  # .join(_df_colors, left_on="last_answer", right_on="value")
+    
+        _fig = px.parallel_categories(
+            _df_plot.select(
+                "first_answer",
+                "last_answer",
+                # "color",
+                pl.col(_dimension).alias(name_dict.get(_dimension)),
+            ).sort(name_dict.get(_dimension), "first_answer", "last_answer"),
+            dimensions=[name_dict.get(_dimension), "first_answer", "last_answer"],
+            title=f"<b>{name_dict.get(_question_name)}</b>",
+            subtitle=f"[{_question_name}]",
+            # color="color",
+            labels={
+                "first_answer": "Primeira resposta da família",
+                "last_answer": "Última resposta da família",
+            },
         )
-    )  # .join(_df_colors, left_on="last_answer", right_on="value")
 
-    _fig = px.parallel_categories(
-        _df_plot.select(
-            "first_answer",
-            "last_answer",
-            # "color",
-            pl.col(_dimension).alias(name_dict.get(_dimension)),
-        ).sort(name_dict.get(_dimension), "first_answer", "last_answer"),
-        dimensions=[name_dict.get(_dimension), "first_answer", "last_answer"],
-        title=f"<b>{name_dict.get(_question_name)}</b>",
-        subtitle=f"[{_question_name}]",
-        # color="color",
-        labels={
-            "first_answer": "Primeira resposta da família",
-            "last_answer": "Última resposta da família",
-        },
-    )
-    _fig
+
+
+    
+        return _fig
+    return (get_parallel_cats,)
+
+
+@app.cell
+def _(get_parallel_cats):
+    get_parallel_cats()
     return
 
 
