@@ -434,7 +434,7 @@ def _(df_long_first, df_long_last, name_dict, petal_to_plot, pl, px):
     fig.update_layout(margin=dict(t=100, l=100, r=100, b=100))
     fig
     # fig.show()
-    return (fig,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -1331,8 +1331,18 @@ def _(mo):
         label="Valor máximo do eixo X",
         value=10_000,
     )
-    income_group_by_cols = mo.ui.dictionary(
-        dict(drug_addiction=mo.ui.checkbox(label="Drogadição [WIP]"))
+    # income_group_by_cols = mo.ui.dictionary(
+    #     dict(
+    #         drug_addiction=mo.ui.checkbox(label="Drogadição [WIP]"),
+    #         alcoholism=mo.ui.checkbox(label="Alcoolismo [WIP]"),
+    #     )
+    # )
+    income_group_by_cols = mo.ui.dropdown(
+        options={
+            "Drogadição": "drug_addiction",
+            "Alcoolismo": "alcoholism",
+            "Drogadição + Alcoolismo": "drugs",
+        },
     )
     # drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
@@ -1342,6 +1352,7 @@ def _(mo):
     income_col_to_use = mo.ui.dropdown(
         options={"Renda": "Income", "Renda per Capita": "IncomePerCapita"},
         value="Renda",
+        label="Escolha a variável:",
     )
     # [NICE TO HAVE] percentage e cumulative
     return (
@@ -1378,7 +1389,6 @@ def _(
     cb_last_time,
     df_long,
     df_plot_variables,
-    fig,
     go,
     income_col_to_use,
     income_group_by_cols,
@@ -1408,6 +1418,8 @@ def _(
         Não="\\",  # (blue)
         NA="+",  # (gray)
         Sim=".",  # (orange)
+        # True=".",
+        # False="\\",  # (blue)
         # Não="#1f77b4",  # (blue)
         # NA="#7f7f7f",  # (gray)
         # Sim="#ff7f0e",  # (orange)
@@ -1462,24 +1474,36 @@ def _(
             (pl.col("question") == "Income") & (pl.col("answer") != "NA")
         ).with_columns(pl.col("answer").cast(pl.Float64).alias("Income"))
 
+
+    _data = _data.with_columns(
+        violences=(pl.col("violence_women") == "Sim")
+         & (pl.col("violence_children") == "Sim"),
+        drugs=(pl.col("drug_addiction") == "Sim")
+         & (pl.col("alcoholism") == "Sim"),
+    ).with_columns(
+        violences=pl.when(pl.col.violences == True).then(pl.lit("Sim")).when(pl.col.violences == False).then(pl.lit("Não")),
+        drugs=pl.when(pl.col.drugs == True).then(pl.lit("Sim")).when(pl.col.drugs == False).then(pl.lit("Não"))
+    )
+
     _first_data = _data.filter(pl.col.time == "FIRST")
     _last_data = _data.filter(pl.col.time == "LAST")
 
     _fig = go.Figure()
 
     # income_group_by_cols = [drugs_addiction_toggle.value]
-    _group_by_cols = [
-        k for (k, v) in income_group_by_cols.items() if v.value is True
-    ]
+    _group_by_col = income_group_by_cols.value
+    # _group_by_col = [
+    #     k for (k, v) in income_group_by_cols.items() if v.value is True
+    # ]
 
     if cb_first_time.value:
-        if len(_group_by_cols) > 0:
-            for group_name, group_df in _first_data.group_by(_group_by_cols):
+        if _group_by_col:
+            for group_name, group_df in _first_data.group_by(_group_by_col):
                 # print(group_df)
                 print(group_name[0])
                 _fig.add_trace(
                     go.Histogram(
-                        name=f"Tempo inicial, {group_name[0]}",
+                        name=f"Tempo inicial, {income_group_by_cols.selected_key}: {group_name[0]}",
                         # marker_color=_palette_first.get(group_name[0]),
                         marker=dict(
                             pattern=dict(
@@ -1582,10 +1606,15 @@ def _(
         xaxis=dict(range=[0, max_x_slider.value if max_x_slider.value else 300]),
         bargap=0.1,
     )
-    fig.update_layout(
-        barmode="relative"
-    )  # ['stack', 'group', 'overlay', 'relative']
-
+    _fig.update_layout(
+        legend=dict(
+            orientation="v",
+            y=0.7,      # Slightly above the plot area
+            x=0.8,       # Centered horizontally
+            xanchor="center",
+            yanchor="bottom"
+        )
+    )
     mo.vstack(
         [
             mo.hstack(
@@ -1606,9 +1635,10 @@ def _(
             ),
             mo.hstack(
                 # drugs_addiction_toggle,
-                list(
-                    income_group_by_cols.values(),
-                ),
+                # list(
+                #     income_group_by_cols.values(),
+                # ),
+                [income_group_by_cols],
                 justify="start",
             ),
             _fig,
