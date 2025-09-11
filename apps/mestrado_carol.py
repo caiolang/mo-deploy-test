@@ -879,7 +879,7 @@ def _(df_plot_variables, pl, plot_answer_histogram, px):
             figs_list.append(fig)
 
         return figs_list
-    return (plot_histograms_income,)
+    return plot_histograms_income, title_dict
 
 
 @app.cell
@@ -922,6 +922,11 @@ def _(cum_5, mo, pct_5, plot_histograms_income):
     return
 
 
+@app.cell
+def _():
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""#### Violência contra mulheres""")
@@ -952,6 +957,174 @@ def _(cum_5, mo, pct_5, plot_histograms_income):
         )
     )
     return
+
+
+@app.cell(hide_code=True)
+def _(df_plot_variables, pl, plot_answer_histogram_, title_dict):
+    _col = "drug_addiction"
+    _val = "Sim"
+    _df = df_plot_variables.filter(pl.col(_col) == _val)
+    _percentage = True
+    _cum = True
+
+    plot_answer_histogram_(
+        _df,
+        question_name="Income",
+        title="Distribuição de renda (Income)",
+        subtitle=f"{title_dict.get(_col)}: {_val}",
+        # color_palette=_palette_dict.get(_val, px.colors.qualitative.Pastel),
+        bin_count=10,
+        y_max=120 if _percentage else None,
+        upper_limit=10_000,
+        percentage=_percentage,
+        cumulative=_cum,
+    )
+    return
+
+
+@app.cell
+def _(pl, px):
+    def plot_answer_histogram_(
+        df,
+        question_name,
+        bin_count=10,
+        title=None,
+        upper_limit=100_000,
+        show_values=True,
+        cumulative=False,
+        subtitle=None,
+        # group_by=None,
+        color_palette=None,
+        y_max=None,
+        percentage=False,
+    ):
+        """
+        Create a histogram visualization of the 'answer' column data.
+
+        Parameters:
+        - df: Polars DataFrame containing the data
+        - question_name: Optional filter to show only specific question
+        - title: Optional custom title for the plot
+        - color_palette: Optional color palette for the bars
+        - percentage: If True, show percentages instead of counts
+
+        Returns:
+        - Plotly figure object
+        """
+
+        conditions = (pl.col("question") == question_name) & (
+            pl.col("answer") != "NA"
+        )
+
+        select_cols = [pl.col("answer").cast(pl.Float32)]
+
+        # Filtra por question
+        df_filtered = df.filter(conditions)
+
+        df_filtered = df_filtered.select(select_cols)
+
+        # Aplica o limite superior (upper_limit) para eliminar outliers, caso informado
+        if upper_limit:
+            df_filtered = df_filtered.filter(pl.col("answer") <= upper_limit)
+
+        # Gera os dados de histograma usando .hist()
+        hist_data = pl.Series(df_filtered).hist(bin_count=10)
+        # [TODO] Fazer uma função de bin própria que receba o módulo que cada bin deve ter (ex.: cada bin é R$500 ou R$1000 a mais)
+        # hist_data = pl.Series(df_filtered).hist()
+
+        # Calcula percentuais
+        total_count = hist_data.select("count").sum().item()
+
+        hist_data = hist_data.with_columns(
+            (pl.col("count") / total_count * 100).alias("percentage")
+        )
+
+        hist_data = hist_data.with_columns(
+            cum_count=pl.col("count").cum_sum(),
+            cum_pct=pl.col("percentage").cum_sum(),
+            # cum_pct=pl.col("percentage").sort("breakpoint").cum_sum(),
+        )
+
+        labels_dict = {
+            "breakpoint": "Limite superior",
+            "percentage": "Percentual de famílias",
+            "count": "Núm de famílias",
+            "cum_count": "Núm de famílias cumulativo",
+            "cum_pct": "% de famílias cumulativo",
+        }
+
+        # Configura colunas
+        if percentage:
+            if cumulative:
+                y_column = "cum_pct"
+            else:
+                y_column = "percentage"
+            # y_label = "Percentual de famílias"
+            # y_title = "Percentual de famílias no bin"
+        else:
+            if cumulative:
+                y_column = "cum_count"
+            else:
+                y_column = "count"
+            # y_label = "Núm de famílias"
+            # y_title = "Número de famílias no bin"
+
+        y_label = labels_dict.get(y_column)
+        y_title = y_label + " no bin"
+        # print(hist_data.head())
+
+        # Gera a imagem do histograma
+
+        if cumulative:
+            title += " (Cumulative)"
+
+        fig = px.bar(
+            hist_data,
+            # x="category",
+            x="breakpoint",
+            y=y_column,
+            title=title
+            or f"Distribution of Answers{' for ' + question_name if question_name else ''}",
+            subtitle=subtitle or "",
+            color_discrete_sequence=color_palette or px.colors.qualitative.Set3,
+            labels=labels_dict,
+            hover_data=[
+                "count",
+                "percentage",
+                "cum_count",
+                "cum_pct",
+            ],
+        )
+
+        x_kwargs = dict(
+            tickformat=",.2f",
+            tickprefix="R$ ",
+            tickangle=-45,
+            title="Limit superior do bin",
+            range=[0, upper_limit],
+        )
+
+        y_kwargs = dict(
+            title=y_title,
+            range=[0, y_max] if y_max else None,
+        )
+
+        # Update layout
+        fig.update_layout(
+            xaxis=x_kwargs,
+            yaxis=y_kwargs,
+        )
+
+        if show_values:
+            if percentage:
+                fig.update_traces(texttemplate="%{y:.1f}%", textposition="outside")
+            else:
+                fig.update_traces(texttemplate="%{y}", textposition="outside")
+
+        # fig.show()
+
+        return fig
+    return (plot_answer_histogram_,)
 
 
 @app.cell(hide_code=True)
@@ -1143,6 +1316,158 @@ def _(cum_5, df_plot_variables, pct_5, plot_answer_histogram, px):
     return
 
 
+@app.cell
+def _(mo):
+    bin_size_slider = mo.ui.slider(start=200, stop=1000, step=100, label="Tamanho de cada bin (R$)", value=500)
+    max_y_slider = mo.ui.slider(start=50, stop=1000, step=50, label="Valor máximo do eixo Y", value=400)
+    max_x_slider = mo.ui.slider(start=1_000, stop=10_000, step=1_000, label="Valor máximo do eixo X", value=10_000)
+    drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
+    cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
+    cb_last_time = mo.ui.checkbox(label="Tempo final")
+
+    # income / per capita
+    # [NICE TO HAVE] percentage e cumulative
+    return (
+        bin_size_slider,
+        cb_first_time,
+        cb_last_time,
+        drugs_addiction_toggle,
+        max_x_slider,
+        max_y_slider,
+    )
+
+
+@app.cell
+def _(
+    bin_size_slider,
+    cb_first_time,
+    cb_last_time,
+    df_long,
+    df_long_first,
+    drugs_addiction_toggle,
+    go,
+    max_x_slider,
+    max_y_slider,
+    mo,
+    pl,
+):
+    _col_to_use = "Income"
+    # _col_to_use = "IncomePerCapita"
+
+
+    # [TODO] FILTER CONDITIONS
+    # [TODO] PERCENTAGE AND CUMULATIVE
+
+    _fig_info = {
+        "Income": dict(title="Renda", max_y=400),
+        "IncomePerCapita": dict(title="Renda per Capita", max_y=400),
+    }
+
+
+    # [TODO] add essa coluna no processamento da base?
+    if _col_to_use == "IncomePerCapita":
+        _data = (
+            # 583 famílias tem dados de HowManyPHHH, e 577 tem Income marcado no seu primeiro tempo. Pegamos a intersecção entre esses grupos (537 famílias)
+            df_long.filter(
+                (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
+            )
+            .select(
+                "id_family_datalake",
+                pl.col("answer").cast(pl.Int32).alias("num_family_members"),
+            )
+            .join(
+                df_long_first.filter(
+                    # [NOTE] Pegamos as respostas válidas de renda no primeiro tempo da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
+                    (pl.col("question") == "Income") & (pl.col("answer") != "NA")
+                ).select(
+                    "id_family_datalake",
+                    pl.col("answer").cast(pl.Float64).alias("Income"),
+                ),
+                on="id_family_datalake",
+                how="inner",
+            )
+            .with_columns(
+                IncomePerCapita=pl.col("Income") / pl.col("num_family_members")
+            )
+        )
+    elif _col_to_use == "Income":
+        _data = df_long_first.filter(
+            (pl.col("question") == "Income") & (pl.col("answer") != "NA")
+        ).with_columns(pl.col("answer").cast(pl.Float64).alias("Income"))
+
+
+    _fig = go.Figure(
+        data=[
+            go.Histogram(
+                name="SIM Alcoolismo",
+                x=pl.Series(_data[_col_to_use]).to_numpy(),
+                xbins=dict(
+                    start=0,
+                    end=10_000,
+                    size=bin_size_slider.value if bin_size_slider.value else 500,
+                ),
+                hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+            ),
+            go.Histogram(
+                x=pl.Series(_data[_col_to_use]).to_numpy(),
+                name="NÃO Alcoolismo",
+                xbins=dict(
+                    start=0,
+                    end=10_000,
+                    size=500,
+                ),
+                hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+            ),
+        ]
+    )
+
+    # _fig.update_layout(bargap=0.1)
+    # _fig.update_layout(xaxis=dict(range=[0, 10_000]))
+    # _fig.update_layout(yaxis=dict(range=[0, 400]))
+    _fig.update_layout(
+        title={
+            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>Subtitle goes here</sup>",
+            "x": 0.5,  # Center the title
+        },
+        xaxis_title=_fig_info.get(_col_to_use).get("title", "X Axis"),
+        yaxis_title="Número de respostas no bin",
+        yaxis=dict(range=[0, max_y_slider.value if max_y_slider.value else 300]),
+        xaxis=dict(range=[0, max_x_slider.value if max_x_slider.value else 300]),
+        bargap=0.1,
+    )
+
+    mo.vstack(
+        [
+            mo.hstack(
+                [
+                    bin_size_slider,
+                    max_y_slider,
+                    max_x_slider,
+                ],
+                justify="start",
+            ),
+            mo.hstack(
+                [
+                    cb_first_time,
+                    cb_last_time,
+                    drugs_addiction_toggle,
+                ],
+                justify="start",
+            ),
+            _fig,
+        ]
+    )
+    # _data.describe()
+    # df_long.filter(
+    #         (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
+    #     ).describe()
+    # df_long_first.filter(
+    #             # [NOTE] Pegamos as respostas válidas de renda no primeiro tempo da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
+    #             (pl.col("question") == "Income")
+    #             & (pl.col("answer") != "NA")).describe()
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""#### Tipo de trabalho (IncomeWorkS3)""")
@@ -1263,70 +1588,76 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _():
-    # _data = (
-    #     df_long.filter(pl.col("question") == "HowManyPHHH")
-    #     .select(
-    #         "id_family_datalake",
-    #         pl.col("answer").alias("num_family_members"),
-    #         # "time",
-    #     )
-    #     .join(
-    #         df_long_first.filter(
-    #             (pl.col("question") == "Income")
-    #             & (pl.col("time") == 0)
-    #             & (pl.col("answer") != "NA")
-    #         ).select(
-    #             "id_family_datalake",
-    #             pl.col("answer").alias("income"),
-    #             # "time",
-    #         ),
-    #         on="id_family_datalake",
-    #     )
-    #     .with_columns(
-    #         income_per_capita=pl.col("income") / pl.col("num_family_members")
-    #     )
-    # )
+    return
 
-    # _chart = (
-    #     alt.Chart(_data)  # <-- replace with data
-    #     .mark_bar()
-    #     .encode(
-    #         x=alt.X(
-    #             "income_per_capita",
-    #             type="quantitative",
-    #             bin=True,
-    #             title="income_per_capita",
-    #         ),
-    #         y=alt.Y("count()", type="quantitative", title="Number of records"),
-    #         tooltip=[
-    #             alt.Tooltip(
-    #                 "income_per_capita",
-    #                 type="quantitative",
-    #                 bin=alt.Bin(step=BIN_SIZE),
-    #                 title="income_per_capita",
-    #                 format=",.2f",
-    #             ),
-    #             alt.Tooltip(
-    #                 "count()",
-    #                 type="quantitative",
-    #                 format=",.0f",
-    #                 title="Number of records",
-    #             ),
-    #         ],
-    #     )
-    #     .properties(width="container")
-    #     .configure_view(stroke=None)
-    # )
-    # _chart
+
+@app.cell
+def _(BIN_SIZE, alt, df_long, df_long_first, pl):
+    _data = (
+        df_long.filter(
+            (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
+        )
+        .select(
+            "id_family_datalake",
+            pl.col("answer").cast(pl.Int32).alias("num_family_members"),
+        )
+        .join(
+            df_long_first.filter(
+                (pl.col("question") == "Income")
+                & (pl.col("time") == 0)
+                & (pl.col("answer") != "NA")
+            ).select(
+                "id_family_datalake",
+                pl.col("answer").cast(pl.Float64).alias("income"),
+                # "time",
+            ),
+            on="id_family_datalake",
+        )
+        .with_columns(
+            income_per_capita=pl.col("income") / pl.col("num_family_members")
+        )
+    )
+
+    _chart = (
+        alt.Chart(_data)  # <-- replace with data
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "income_per_capita",
+                type="quantitative",
+                bin=True,
+                title="income_per_capita",
+            ),
+            y=alt.Y("count()", type="quantitative", title="Number of records"),
+            tooltip=[
+                alt.Tooltip(
+                    "income_per_capita",
+                    type="quantitative",
+                    bin=alt.Bin(step=BIN_SIZE),
+                    title="income_per_capita",
+                    format=",.2f",
+                ),
+                alt.Tooltip(
+                    "count()",
+                    type="quantitative",
+                    format=",.0f",
+                    title="Number of records",
+                ),
+            ],
+        )
+        .properties(width="container")
+        .configure_view(stroke=None)
+    )
+    _chart
     return
 
 
 @app.cell
 def _():
     BIN_SIZE = 500
-    return
+    return (BIN_SIZE,)
 
 
 @app.cell(hide_code=True)
@@ -1586,6 +1917,7 @@ def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
         set(questions) - set(wip_multiple_assertions) - set(wip_other)
     )
     return (
+        df_long,
         df_long_first,
         df_long_last,
         df_long_periods,
@@ -2407,7 +2739,7 @@ def _():
     import plotly.graph_objects as go
     from rich import print
     import numpy as np
-    return GT, loc, md, np, pl, print, px, style
+    return GT, alt, go, loc, md, np, pl, print, px, style
 
 
 @app.cell
