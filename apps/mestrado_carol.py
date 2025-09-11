@@ -1361,7 +1361,7 @@ def _(
                 justify="start",
             ),
             _fig,
-            mo.accordion({"Descrição estatística do agrupamento": mo.hstack(_gt, justify="center")}) if _gt else "",
+            mo.accordion({"Descrição estatística do agrupamento": mo.hstack(_gt, justify="space-between")}) if _gt else "",
         ]
     )
     return
