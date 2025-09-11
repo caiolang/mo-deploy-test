@@ -1,10 +1,10 @@
 import marimo
 
 __generated_with = "0.15.2"
-app = marimo.App(width="columns")
+app = marimo.App(width="columns", app_title="Mestrado Carolina Jansen")
 
 
-@app.cell(column=0, hide_code=True)
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""# Mestrado""")
     return
@@ -1341,7 +1341,8 @@ def _(mo):
             "Drogadição + Alcoolismo": "drugs",
         },
         label="Escolha a variável de agrupamento: ",
-        value="Drogadição",
+        # value="Drogadição",
+        allow_select_none=True,
     )
 
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
@@ -1652,6 +1653,8 @@ def _(
             yanchor="bottom",
         )
     )
+    _fig.update_layout(width=900)  # Set width in pixels
+
     mo.vstack(
         [
             mo.hstack(
@@ -2056,7 +2059,7 @@ def _():
     return
 
 
-@app.cell(column=1)
+@app.cell
 def _(enrich_first_and_last_time, get_vars_IGF, mo, pl):
     # Leitura do df original em CSV
     df_long_path = str(mo.notebook_location() / "public" / "df_long.csv")
@@ -2942,7 +2945,7 @@ def _():
     return (mo,)
 
 
-@app.cell(column=2)
+@app.cell
 def _():
     import random
 
