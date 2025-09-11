@@ -434,7 +434,7 @@ def _(df_long_first, df_long_last, name_dict, petal_to_plot, pl, px):
     fig.update_layout(margin=dict(t=100, l=100, r=100, b=100))
     fig
     # fig.show()
-    return
+    return (fig,)
 
 
 @app.cell(hide_code=True)
@@ -1322,7 +1322,7 @@ def _(mo):
         start=200, stop=1000, step=100, label="Tamanho de cada bin (R$)", value=500
     )
     max_y_slider = mo.ui.slider(
-        start=50, stop=1000, step=50, label="Valor máximo do eixo Y", value=400
+        start=50, stop=1000, step=50, label="Valor máximo do eixo Y", value=450
     )
     max_x_slider = mo.ui.slider(
         start=1_000,
@@ -1331,7 +1331,10 @@ def _(mo):
         label="Valor máximo do eixo X",
         value=10_000,
     )
-    drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
+    income_group_by_cols = mo.ui.dictionary(
+        dict(drug_addiction=mo.ui.checkbox(label="Drogadição [WIP]"))
+    )
+    # drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
     cb_last_time = mo.ui.checkbox(label="Tempo final")
 
@@ -1345,11 +1348,27 @@ def _(mo):
         bin_size_slider,
         cb_first_time,
         cb_last_time,
-        drugs_addiction_toggle,
         income_col_to_use,
+        income_group_by_cols,
         max_x_slider,
         max_y_slider,
     )
+
+
+@app.cell
+def _():
+    import matplotlib.colors as mcolors
+
+    def lighten_color(hex_color, amount=0.5):
+        # amount: 0 = original, 1 = white
+        c = mcolors.to_rgb(hex_color)
+        return mcolors.to_hex([1 - (1 - x) * (1 - amount) for x in c])
+
+    # Example usage:
+    # original = "purple"
+    # toned_down = lighten_color(original, amount=0.5)  # 0.5 is 50% lighter
+    # print(toned_down)
+    return (lighten_color,)
 
 
 @app.cell
@@ -1359,13 +1378,16 @@ def _(
     cb_last_time,
     df_long,
     df_plot_variables,
-    drugs_addiction_toggle,
+    fig,
     go,
     income_col_to_use,
+    income_group_by_cols,
+    lighten_color,
     max_x_slider,
     max_y_slider,
     mo,
     pl,
+    print,
 ):
     _col_to_use = income_col_to_use.value
     # _col_to_use = "IncomePerCapita"
@@ -1382,6 +1404,17 @@ def _(
         olive="#bcbd22",  # (olive)
         cyan="#17becf",  # (cyan)
     )
+    _palette_pattern = dict(
+        Não="\\",  # (blue)
+        NA="+",  # (gray)
+        Sim=".",  # (orange)
+        # Não="#1f77b4",  # (blue)
+        # NA="#7f7f7f",  # (gray)
+        # Sim="#ff7f0e",  # (orange)
+    )
+    _color_first = "purple"
+    _color_last = "blue"
+
 
     # [TODO] FILTER CONDITIONS
     # [TODO] PERCENTAGE AND CUMULATIVE
@@ -1412,6 +1445,10 @@ def _(
                     "id_family_datalake",
                     pl.col("answer").cast(pl.Float64).alias("Income"),
                     "time",
+                    "drug_addiction",
+                    "alcoholism",
+                    "violence_women",
+                    "violence_children",
                 ),
                 on="id_family_datalake",
                 how="inner",
@@ -1430,26 +1467,98 @@ def _(
 
     _fig = go.Figure()
 
+    # income_group_by_cols = [drugs_addiction_toggle.value]
+    _group_by_cols = [
+        k for (k, v) in income_group_by_cols.items() if v.value is True
+    ]
+
     if cb_first_time.value:
-        _fig.add_trace(
-            go.Histogram(
-                name="Tempo inicial",
-                marker_color=_palette.get("purple"),
-                x=pl.Series(_first_data[_col_to_use]).to_numpy(),
-                xbins=dict(
-                    start=0,
-                    end=10_000,
-                    size=bin_size_slider.value if bin_size_slider.value else 500,
+        if len(_group_by_cols) > 0:
+            for group_name, group_df in _first_data.group_by(_group_by_cols):
+                # print(group_df)
+                print(group_name[0])
+                _fig.add_trace(
+                    go.Histogram(
+                        name=f"Tempo inicial, {group_name[0]}",
+                        # marker_color=_palette_first.get(group_name[0]),
+                        marker=dict(
+                            pattern=dict(
+                                shape=_palette_pattern.get(
+                                    group_name[0]
+                                ),  # ['', '/', '\\', 'x', '-', '|', '+', '.']
+                                fillmode="overlay",  # "overlay" or "replace"
+                                fgcolor=lighten_color(
+                                    _color_first, 0.1
+                                ),  # Foreground color of pattern
+                                bgcolor=lighten_color(
+                                    _color_first
+                                ),  # Background color of pattern
+                                size=10,  # Size of pattern elements
+                                solidity=0.1,  # Opacity of pattern
+                                fgopacity=0.5,
+                            ),
+                            line=dict(
+                                color=_color_first,  # Contour color
+                                width=1,  # Contour width in pixels
+                            ),
+                        ),
+                        x=pl.Series(group_df[_col_to_use]).to_numpy(),
+                        xbins=dict(
+                            start=0,
+                            end=10_000,
+                            size=bin_size_slider.value
+                            if bin_size_slider.value
+                            else 500,
+                        ),
+                        hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+                    ),
+                )
+        else:
+            _fig.add_trace(
+                go.Histogram(
+                    name="Tempo inicial",
+                    marker=dict(
+                        pattern=dict(
+                            shape="-",
+                            fgcolor=lighten_color(_color_first, 0.1),
+                            bgcolor=lighten_color(_color_first),
+                            fgopacity=0.0,
+                        ),
+                        line=dict(
+                            color=_color_first,  # Contour color
+                            width=1,  # Contour width in pixels
+                        ),
+                    ),
+                    x=pl.Series(_first_data[_col_to_use]).to_numpy(),
+                    xbins=dict(
+                        start=0,
+                        end=10_000,
+                        size=bin_size_slider.value
+                        if bin_size_slider.value
+                        else 500,
+                    ),
+                    hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
                 ),
-                hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-            ),
-        )
+            )
         _subtitle_l.append("Tempo inicial")
+
     if cb_last_time.value:
         _fig.add_trace(
             go.Histogram(
                 name="Tempo final",
-                marker_color=_palette.get("blue"),
+                # marker_color=_color_last,
+                marker=dict(
+                        pattern=dict(
+                            shape="-",
+                            fgcolor=lighten_color(_color_last, 0.1),
+                            bgcolor=lighten_color(_color_last),
+                            fgopacity=0.0,
+                        ),
+                        line=dict(
+                            color=_color_last,  # Contour color
+                            width=1,  # Contour width in pixels
+                        ),
+                    ),
                 x=pl.Series(_last_data[_col_to_use]).to_numpy(),
                 xbins=dict(
                     start=0,
@@ -1460,60 +1569,6 @@ def _(
             ),
         )
         _subtitle_l.append("Tempo final")
-    #     data=[
-    #         go.Histogram(
-    #             name="SIM Alcoolismo",
-    #             x=pl.Series(_data[_col_to_use]).to_numpy(),
-    #             xbins=dict(
-    #                 start=0,
-    #                 end=10_000,
-    #                 size=bin_size_slider.value if bin_size_slider.value else 500,
-    #             ),
-    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-    #         ),
-    #         go.Histogram(
-    #             x=pl.Series(_data[_col_to_use]).to_numpy(),
-    #             name="NÃO Alcoolismo",
-    #             xbins=dict(
-    #                 start=0,
-    #                 end=10_000,
-    #                 size=500,
-    #             ),
-    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-    #         ),
-    #     ]
-    # )
-
-
-    # _fig = go.Figure(
-    #     data=[
-    #         go.Histogram(
-    #             name="Tempo inicial",
-    #             x=pl.Series(_first_data[_col_to_use]).to_numpy(),
-    #             xbins=dict(
-    #                 start=0,
-    #                 end=10_000,
-    #                 size=bin_size_slider.value if bin_size_slider.value else 500,
-    #             ),
-    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-    #         ),
-    #         go.Histogram(
-    #             x=pl.Series(_last_data[_col_to_use]).to_numpy(),
-    #             name="Tempo final",
-    #             xbins=dict(
-    #                 start=0,
-    #                 end=10_000,
-    #                 size=500,
-    #             ),
-    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
-    #         ),
-    #     ]
-    # )
-
-    # _fig.update_layout(bargap=0.1)
-    # _fig.update_layout(xaxis=dict(range=[0, 10_000]))
-    # _fig.update_layout(yaxis=dict(range=[0, 400]))
-
 
     _fig.update_layout(
         title={
@@ -1527,6 +1582,9 @@ def _(
         xaxis=dict(range=[0, max_x_slider.value if max_x_slider.value else 300]),
         bargap=0.1,
     )
+    fig.update_layout(
+        barmode="relative"
+    )  # ['stack', 'group', 'overlay', 'relative']
 
     mo.vstack(
         [
@@ -1542,9 +1600,15 @@ def _(
                 [
                     cb_first_time,
                     cb_last_time,
-                    drugs_addiction_toggle,
                     income_col_to_use,
                 ],
+                justify="start",
+            ),
+            mo.hstack(
+                # drugs_addiction_toggle,
+                list(
+                    income_group_by_cols.values(),
+                ),
                 justify="start",
             ),
             _fig,
