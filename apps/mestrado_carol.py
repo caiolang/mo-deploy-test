@@ -1497,23 +1497,6 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.vstack(
-        [
-            mo.callout(
-                "DOING: Colocar cor de acordo com a última resposta da família",
-                kind="info",
-            ),
-            mo.callout(
-                "DOING: Filtrar gêneros, juntar grupos raciais, de-para de valores de resposta",
-                kind="info",
-            ),
-        ]
-    )
-    return
-
-
 @app.cell
 def _(
     df_long_first,
@@ -1565,6 +1548,25 @@ def _(
             )
         ).join(_df_colors, left_on="last_answer", right_on="value")
 
+        if _dimension == "race":
+            _df_plot = _df_plot.with_columns(
+                race=pl.when(
+                    (pl.col("race") == "Parda")
+                    | (pl.col("race") == "Preta")
+                    | (pl.col("race") == "Indígena")
+                )
+                .then(pl.lit("Negros e indígenas"))
+                .otherwise(pl.lit("Brancos e amarelos"))
+            )
+        if _dimension == "gender":
+            _df_plot = _df_plot.filter(
+                pl.col.gender.is_in([
+                    "Mulher trans", # 2 pessoa
+                    "Homem trans", # 1 pessoa
+                    "Não binário",# 1 pessoa
+                ]).not_()
+            )
+
         _fig = px.parallel_categories(
             _df_plot.select(
                 "first_answer",
@@ -1615,132 +1617,6 @@ def _(mo, name_dict):
 @app.cell
 def _(get_parallel_cats):
     get_parallel_cats()
-    return
-
-
-@app.cell
-def _(df_long_first, df_long_last, dimension_6, name_dict, pl, px, question_6):
-    _igf_color_dict = dict(
-        value=["Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
-        color=["#EB7E69", "#F7F7A1", "#72B7B2", "#3366CC", "#6E899C"],
-        # value=["E1", "Não sei ler", "Não muito bem", "Bem", "Muito bem", "NA"],
-    )
-
-    _dimension = dimension_6.value
-    _question_name = question_6.value
-
-    _df_colors = pl.DataFrame(_igf_color_dict)
-
-    _df_plot = (
-        df_long_first.filter(pl.col("question") == _question_name)
-        .with_columns(first_answer="answer")
-        .select("id_family_datalake", "question", "first_answer", _dimension)
-        .join(
-            df_long_last.with_columns(last_answer="answer"),
-            on=["id_family_datalake", "question"],
-            how="left",
-        )
-        # .with_columns(last_answer="answer")
-        .select(
-            "id_family_datalake",
-            "question",
-            "first_answer",
-            "last_answer",
-            _dimension,
-        )
-    )  # .join(_df_colors, left_on="last_answer", right_on="value")
-
-    _fig = px.parallel_categories(
-        _df_plot.select(
-            "first_answer",
-            "last_answer",
-            # "color",
-            pl.col(_dimension).alias(name_dict.get(_dimension)),
-        ).sort(name_dict.get(_dimension), "first_answer", "last_answer"),
-        dimensions=[name_dict.get(_dimension), "first_answer", "last_answer"],
-        title=f"<b>{name_dict.get(_question_name)}</b>",
-        subtitle=f"[{_question_name}]",
-        # color="color",
-        labels={
-            "first_answer": "Primeira resposta da família",
-            "last_answer": "Última resposta da família",
-        },
-    )
-    _fig
-    return
-
-
-@app.cell
-def _():
-    # _questions = [
-    #     "FoodManytimes",
-    #     "SchoolLiteracy",
-    #     "IncomeWorkS3",
-    # ]
-
-    # mo.accordion(
-    #     {
-    #         k: get_descriptive_table(
-    #             df_long_first.filter(
-    #                 pl.col("gender").is_in(
-    #                     [
-    #                         "Mulher cis",
-    #                         "Homem cis",
-    #                     ]
-    #                 )
-    #             ),
-    #             df_long_last.filter(
-    #                 pl.col("gender").is_in(
-    #                     [
-    #                         "Mulher cis",
-    #                         "Homem cis",
-    #                     ]
-    #                 )
-    #             ),
-    #             question_name=k,
-    #             describe_by="race",
-    #             mix_pp=True,
-    #         )
-    #         for k in _questions
-    #     }
-    # )
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    # _questions = [
-    #     "FoodManytimes",
-    #     "SchoolLiteracy",
-    #     "IncomeWorkS3",
-    # ]
-
-    # mo.accordion(
-    #     {
-    #         k: get_descriptive_table(
-    #             df_long_first.filter(
-    #                 pl.col("gender").is_in(
-    #                     [
-    #                         "Mulher cis",
-    #                         "Homem cis",
-    #                     ]
-    #                 )
-    #             ),
-    #             df_long_last.filter(
-    #                 pl.col("gender").is_in(
-    #                     [
-    #                         "Mulher cis",
-    #                         "Homem cis",
-    #                     ]
-    #                 )
-    #             ),
-    #             question_name=k,
-    #             describe_by="gender",
-    #             mix_pp=True,
-    #         )
-    #         for k in _questions
-    #     }
-    # )
     return
 
 
