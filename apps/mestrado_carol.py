@@ -1318,20 +1318,35 @@ def _(cum_5, df_plot_variables, pct_5, plot_answer_histogram, px):
 
 @app.cell
 def _(mo):
-    bin_size_slider = mo.ui.slider(start=200, stop=1000, step=100, label="Tamanho de cada bin (R$)", value=500)
-    max_y_slider = mo.ui.slider(start=50, stop=1000, step=50, label="Valor máximo do eixo Y", value=400)
-    max_x_slider = mo.ui.slider(start=1_000, stop=10_000, step=1_000, label="Valor máximo do eixo X", value=10_000)
+    bin_size_slider = mo.ui.slider(
+        start=200, stop=1000, step=100, label="Tamanho de cada bin (R$)", value=500
+    )
+    max_y_slider = mo.ui.slider(
+        start=50, stop=1000, step=50, label="Valor máximo do eixo Y", value=400
+    )
+    max_x_slider = mo.ui.slider(
+        start=1_000,
+        stop=10_000,
+        step=1_000,
+        label="Valor máximo do eixo X",
+        value=10_000,
+    )
     drugs_addiction_toggle = mo.ui.checkbox(label="Drogadição [WIP]")
     cb_first_time = mo.ui.checkbox(label="Tempo inicial", value=True)
     cb_last_time = mo.ui.checkbox(label="Tempo final")
 
     # income / per capita
+    income_col_to_use = mo.ui.dropdown(
+        options={"Renda": "Income", "Renda per Capita": "IncomePerCapita"},
+        value="Renda",
+    )
     # [NICE TO HAVE] percentage e cumulative
     return (
         bin_size_slider,
         cb_first_time,
         cb_last_time,
         drugs_addiction_toggle,
+        income_col_to_use,
         max_x_slider,
         max_y_slider,
     )
@@ -1343,21 +1358,35 @@ def _(
     cb_first_time,
     cb_last_time,
     df_long,
-    df_long_first,
+    df_plot_variables,
     drugs_addiction_toggle,
     go,
+    income_col_to_use,
     max_x_slider,
     max_y_slider,
     mo,
     pl,
 ):
-    _col_to_use = "Income"
+    _col_to_use = income_col_to_use.value
     # _col_to_use = "IncomePerCapita"
 
+    _palette = dict(
+        blue="#1f77b4",  # (blue)
+        orange="#ff7f0e",  # (orange)
+        green="#2ca02c",  # (green)
+        red="#d62728",  # (red)
+        purple="#9467bd",  # (purple)
+        brown="#8c564b",  # (brown)
+        pink="#e377c2",  # (pink)
+        gray="#7f7f7f",  # (gray)
+        olive="#bcbd22",  # (olive)
+        cyan="#17becf",  # (cyan)
+    )
 
     # [TODO] FILTER CONDITIONS
     # [TODO] PERCENTAGE AND CUMULATIVE
 
+    _subtitle_l = []
     _fig_info = {
         "Income": dict(title="Renda", max_y=400),
         "IncomePerCapita": dict(title="Renda per Capita", max_y=400),
@@ -1368,7 +1397,7 @@ def _(
     if _col_to_use == "IncomePerCapita":
         _data = (
             # 583 famílias tem dados de HowManyPHHH, e 577 tem Income marcado no seu primeiro tempo. Pegamos a intersecção entre esses grupos (537 famílias)
-            df_long.filter(
+            df_long.filter(  # [NOTE] Aqui pegamos do df_long porque a pergunta só foi feita no tempo 0
                 (pl.col("question") == "HowManyPHHH") & (pl.col("answer") != "NA")
             )
             .select(
@@ -1376,12 +1405,13 @@ def _(
                 pl.col("answer").cast(pl.Int32).alias("num_family_members"),
             )
             .join(
-                df_long_first.filter(
-                    # [NOTE] Pegamos as respostas válidas de renda no primeiro tempo da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
+                df_plot_variables.filter(
+                    # [NOTE] Pegamos as respostas válidas de renda no (do primeiro ou último tempo) da família (não necessariamente o tempo 0), apesar de que HowManyPHHH é só no tempo 0 (ex.: para time=="FIRST", usamos os dados de Income de 524 famílias no tempo 0, 13 no tempo 1)
                     (pl.col("question") == "Income") & (pl.col("answer") != "NA")
                 ).select(
                     "id_family_datalake",
                     pl.col("answer").cast(pl.Float64).alias("Income"),
+                    "time",
                 ),
                 on="id_family_datalake",
                 how="inner",
@@ -1391,16 +1421,21 @@ def _(
             )
         )
     elif _col_to_use == "Income":
-        _data = df_long_first.filter(
+        _data = df_plot_variables.filter(
             (pl.col("question") == "Income") & (pl.col("answer") != "NA")
         ).with_columns(pl.col("answer").cast(pl.Float64).alias("Income"))
 
+    _first_data = _data.filter(pl.col.time == "FIRST")
+    _last_data = _data.filter(pl.col.time == "LAST")
 
-    _fig = go.Figure(
-        data=[
+    _fig = go.Figure()
+
+    if cb_first_time.value:
+        _fig.add_trace(
             go.Histogram(
-                name="SIM Alcoolismo",
-                x=pl.Series(_data[_col_to_use]).to_numpy(),
+                name="Tempo inicial",
+                marker_color=_palette.get("purple"),
+                x=pl.Series(_first_data[_col_to_use]).to_numpy(),
                 xbins=dict(
                     start=0,
                     end=10_000,
@@ -1408,28 +1443,85 @@ def _(
                 ),
                 hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
             ),
+        )
+        _subtitle_l.append("Tempo inicial")
+    if cb_last_time.value:
+        _fig.add_trace(
             go.Histogram(
-                x=pl.Series(_data[_col_to_use]).to_numpy(),
-                name="NÃO Alcoolismo",
+                name="Tempo final",
+                marker_color=_palette.get("blue"),
+                x=pl.Series(_last_data[_col_to_use]).to_numpy(),
                 xbins=dict(
                     start=0,
                     end=10_000,
-                    size=500,
+                    size=bin_size_slider.value if bin_size_slider.value else 500,
                 ),
                 hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
             ),
-        ]
-    )
+        )
+        _subtitle_l.append("Tempo final")
+    #     data=[
+    #         go.Histogram(
+    #             name="SIM Alcoolismo",
+    #             x=pl.Series(_data[_col_to_use]).to_numpy(),
+    #             xbins=dict(
+    #                 start=0,
+    #                 end=10_000,
+    #                 size=bin_size_slider.value if bin_size_slider.value else 500,
+    #             ),
+    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+    #         ),
+    #         go.Histogram(
+    #             x=pl.Series(_data[_col_to_use]).to_numpy(),
+    #             name="NÃO Alcoolismo",
+    #             xbins=dict(
+    #                 start=0,
+    #                 end=10_000,
+    #                 size=500,
+    #             ),
+    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+    #         ),
+    #     ]
+    # )
+
+
+    # _fig = go.Figure(
+    #     data=[
+    #         go.Histogram(
+    #             name="Tempo inicial",
+    #             x=pl.Series(_first_data[_col_to_use]).to_numpy(),
+    #             xbins=dict(
+    #                 start=0,
+    #                 end=10_000,
+    #                 size=bin_size_slider.value if bin_size_slider.value else 500,
+    #             ),
+    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+    #         ),
+    #         go.Histogram(
+    #             x=pl.Series(_last_data[_col_to_use]).to_numpy(),
+    #             name="Tempo final",
+    #             xbins=dict(
+    #                 start=0,
+    #                 end=10_000,
+    #                 size=500,
+    #             ),
+    #             hovertemplate="Bin: R$ %{x}<br>Count: %{y}<extra></extra>",
+    #         ),
+    #     ]
+    # )
 
     # _fig.update_layout(bargap=0.1)
     # _fig.update_layout(xaxis=dict(range=[0, 10_000]))
     # _fig.update_layout(yaxis=dict(range=[0, 400]))
+
+
     _fig.update_layout(
         title={
-            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>Subtitle goes here</sup>",
+            "text": f"{_fig_info.get(_col_to_use).get('title', '')}<br><sup>{(' e ').join(_subtitle_l)}</sup>",
             "x": 0.5,  # Center the title
         },
-        xaxis_title=_fig_info.get(_col_to_use).get("title", "X Axis"),
+        xaxis_title=_fig_info.get(_col_to_use).get("title", "")
+        + f" (bins de R${bin_size_slider.value})",
         yaxis_title="Número de respostas no bin",
         yaxis=dict(range=[0, max_y_slider.value if max_y_slider.value else 300]),
         xaxis=dict(range=[0, max_x_slider.value if max_x_slider.value else 300]),
@@ -1451,6 +1543,7 @@ def _(
                     cb_first_time,
                     cb_last_time,
                     drugs_addiction_toggle,
+                    income_col_to_use,
                 ],
                 justify="start",
             ),
