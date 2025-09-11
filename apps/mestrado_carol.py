@@ -1241,20 +1241,24 @@ def _(
 
         # ----
 
+        # return _fig, None
         if not _group_by_col:
             return _fig, None
+
+        _cols_gt = _col_to_use
+        # if _col_to_use = "
 
         _df_gt_first = pl.concat(
             [
                 (
                     _first_data.filter(True & (pl.col(_group_by_col) == "Sim"))
-                    .select("IncomePerCapita", "Income", "num_family_members")
+                    .select(_cols_gt)
                     .describe()
                     .with_columns(answer=pl.lit("Sim"))
                 ),
                 (
                     _first_data.filter(True & (pl.col(_group_by_col) == "Não"))
-                    .select("IncomePerCapita", "Income", "num_family_members")
+                    .select(_cols_gt)
                     .describe()
                     .with_columns(answer=pl.lit("Não"))
                 ),
@@ -1265,13 +1269,13 @@ def _(
             [
                 (
                     _last_data.filter(True & (pl.col(_group_by_col) == "Sim"))
-                    .select("IncomePerCapita", "Income", "num_family_members")
+                    .select(_cols_gt)
                     .describe()
                     .with_columns(answer=pl.lit("Sim"))
                 ),
                 (
                     _last_data.filter(True & (pl.col(_group_by_col) == "Não"))
-                    .select("IncomePerCapita", "Income", "num_family_members")
+                    .select(_cols_gt)
                     .describe()
                     .with_columns(answer=pl.lit("Não"))
                 ),
@@ -1283,23 +1287,23 @@ def _(
                 _df.filter(pl.col.statistic != "null_count")
             )
             .fmt_number(
-                columns=["IncomePerCapita", "Income"],
+                columns=[_col_to_use],
                 # force_sign=True,
                 decimals=2,
                 # scale_by=100,
                 pattern="R$ {x}",
                 rows=list(range(1, 8)) + list(range(9, 16)),
             )
+            # .fmt_number(
+            #     columns=["num_family_members"],
+            #     # force_sign=True,
+            #     decimals=2,
+            #     # scale_by=100,
+            #     pattern="{x}",
+            #     rows=list(range(1, 8)) + list(range(9, 16)),
+            # )
             .fmt_number(
-                columns=["num_family_members"],
-                # force_sign=True,
-                decimals=2,
-                # scale_by=100,
-                pattern="{x}",
-                rows=list(range(1, 8)) + list(range(9, 16)),
-            )
-            .fmt_number(
-                columns=["IncomePerCapita", "Income", "num_family_members"],
+                columns=[_cols_gt],
                 decimals=0,
                 pattern="{x}",
                 rows=[0, 8],
@@ -1311,9 +1315,8 @@ def _(
                 ),
             )
             .cols_label(
-                IncomePerCapita=md("Renda per Capita"),
-                Income=md("Renda"),
-                num_family_members=md("Núm. de membros da família"),
+                **{_cols_gt:income_col_to_use.selected_key}
+                # num_family_members=md("Núm. de membros da família"),
             )
             .tab_stub(rowname_col="statistic", groupname_col="answer")
         ) for (_df, _title) in zip([_df_gt_first, _df_gt_last], ["Tempo inicial", "Tempo final"])]
@@ -1361,7 +1364,7 @@ def _(
                 justify="start",
             ),
             _fig,
-            mo.accordion({"Descrição estatística do agrupamento": mo.hstack(_gt, justify="space-between")}) if _gt else "",
+            mo.accordion({"Descrição estatística do agrupamento": mo.hstack(_gt, justify="space-around")}) if _gt else "",
         ]
     )
     return
